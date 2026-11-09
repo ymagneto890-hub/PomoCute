@@ -198,18 +198,23 @@ final class TimerViewModel: ObservableObject {
         let savedTargetEnd = defaults.double(forKey: Keys.targetEnd)
         if savedTargetEnd > 0 {
             let targetDate = Date(timeIntervalSince1970: savedTargetEnd)
-            if targetDate > Date() {
+            let remaining = Int(ceil(targetDate.timeIntervalSinceNow))
+            if remaining > 0 {
                 self.targetEndTime = targetDate
                 self.isRunning = true
-                self.remainingSeconds = Int(ceil(targetDate.timeIntervalSinceNow))
+                self.remainingSeconds = remaining
                 startTicking()
             } else {
+                self.targetEndTime = nil
+                self.isRunning = false
+                self.remainingSeconds = 0
                 finishCycle(credited: true, alert: false)
             }
         }
 
         loadCustomSounds()
         setupDayChangeObserver()
+        checkNotificationAuthorization()
     }
 
     deinit {
@@ -259,7 +264,10 @@ final class TimerViewModel: ObservableObject {
         if let url = Bundle.main.url(forResource: name, withExtension: "caf") {
             return url
         }
-        return Bundle.main.url(forResource: name, withExtension: "caf", subdirectory: "Audio")
+        if let url = Bundle.main.url(forResource: name, withExtension: "caf", subdirectory: "Audio") {
+            return url
+        }
+        return nil
     }
 
     // MARK: - Observador de Cambio de Fecha (Medianoche)
@@ -283,6 +291,15 @@ final class TimerViewModel: ObservableObject {
         defaults.set(targetEndTime?.timeIntervalSince1970 ?? 0, forKey: Keys.targetEnd)
     }
 
+    // MARK: - Verificación de Permisos de Notificaciones
+    func checkNotificationAuthorization() {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            DispatchQueue.main.async {
+                self?.notificationsDenied = (settings.authorizationStatus == .denied)
+            }
+        }
+    }
+
     // MARK: - Control de Temporizador
     func toggle() {
         playPop()
@@ -294,22 +311,41 @@ final class TimerViewModel: ObservableObject {
     }
 
     func start() {
+        guard !isRunning else { return }
         isRunning = true
         targetEndTime = Date().addingTimeInterval(TimeInterval(remainingSeconds))
         scheduleNativeAlarm(seconds: remainingSeconds)
         startTicking()
         persistTimerState()
-
-        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
-            if settings.authorizationStatus == .denied {
-                DispatchQueue.main.async {
-                    self?.notificationsDenied = true
-                }
-            }
-        }
+        checkNotificationAuthorization()
     }
 
     func pause() {
+        guard isRunning else {
+            timerSubscription?.invalidate()
+            timerSubscription = nil
+            cancelNativeAlarm()
+            persistTimerState()
+            return
+        }
+
+        if let target = targetEndTime {
+            let diff = Int(ceil(target.timeIntervalSinceNow))
+            if diff <= 0 {
+                // Caso límite: el usuario pulsó pausa exactamente cuando el temporizador llegó o superó cero
+                remainingSeconds = 0
+                isRunning = false
+                targetEndTime = nil
+                timerSubscription?.invalidate()
+                timerSubscription = nil
+                cancelNativeAlarm()
+                finishCycle(credited: true, alert: true)
+                return
+            } else {
+                remainingSeconds = diff
+            }
+        }
+
         isRunning = false
         targetEndTime = nil
         timerSubscription?.invalidate()
@@ -320,18 +356,30 @@ final class TimerViewModel: ObservableObject {
 
     func reset() {
         playPop()
-        pause()
+        isRunning = false
+        targetEndTime = nil
+        timerSubscription?.invalidate()
+        timerSubscription = nil
+        cancelNativeAlarm()
         applyModeDuration(for: mode)
     }
 
     func skip() {
         playPop()
-        pause()
+        isRunning = false
+        targetEndTime = nil
+        timerSubscription?.invalidate()
+        timerSubscription = nil
+        cancelNativeAlarm()
         finishCycle(credited: false, alert: false)
     }
 
     private func switchMode(_ newMode: PomodoroMode) {
-        pause()
+        isRunning = false
+        targetEndTime = nil
+        timerSubscription?.invalidate()
+        timerSubscription = nil
+        cancelNativeAlarm()
         mode = newMode
         applyModeDuration(for: newMode)
     }
@@ -371,7 +419,11 @@ final class TimerViewModel: ObservableObject {
         let diff = Int(ceil(target.timeIntervalSinceNow))
         if diff <= 0 {
             remainingSeconds = 0
-            pause()
+            isRunning = false
+            targetEndTime = nil
+            timerSubscription?.invalidate()
+            timerSubscription = nil
+            cancelNativeAlarm()
             finishCycle(credited: true, alert: alertOnFinish)
         } else if diff != remainingSeconds {
             remainingSeconds = diff
@@ -381,6 +433,7 @@ final class TimerViewModel: ObservableObject {
     func appDidEnterBackground() {
         timerSubscription?.invalidate()
         timerSubscription = nil
+        persistTimerState()
     }
 
     func appWillResignActive() {
@@ -389,9 +442,22 @@ final class TimerViewModel: ObservableObject {
 
     func appDidBecomeActive() {
         checkAndResetDailyStats()
-        tick(alertOnFinish: false)
-        if isRunning {
-            startTicking()
+        checkNotificationAuthorization()
+
+        if isRunning, let target = targetEndTime {
+            let diff = Int(ceil(target.timeIntervalSinceNow))
+            if diff <= 0 {
+                remainingSeconds = 0
+                isRunning = false
+                targetEndTime = nil
+                timerSubscription?.invalidate()
+                timerSubscription = nil
+                cancelNativeAlarm()
+                finishCycle(credited: true, alert: false)
+            } else {
+                remainingSeconds = diff
+                startTicking()
+            }
         }
     }
 

@@ -34,9 +34,11 @@ struct PomoCuteApp: App {
             switch phase {
             case .active:
                 timerVM.appDidBecomeActive()
+            case .inactive:
+                timerVM.appWillResignActive()
             case .background:
                 timerVM.appDidEnterBackground()
-            default:
+            @unknown default:
                 break
             }
         }
