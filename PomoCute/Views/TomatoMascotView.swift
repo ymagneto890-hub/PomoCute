@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TomatoMascotView: View {
-    @Environment(\\.scenePhase) private var scenePhase
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isBouncing = false
     @State private var isBlinking = false
 
