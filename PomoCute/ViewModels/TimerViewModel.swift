@@ -37,33 +37,96 @@ enum PomodoroMode: String, CaseIterable, Identifiable {
 }
 
 final class TimerViewModel: ObservableObject {
-    // MARK: - Estado de Temporizador
+    // MARK: - Estado de Temporizador Reactivo
     @Published var mode: PomodoroMode = .focus
     @Published var isRunning: Bool = false
     @Published var remainingSeconds: Int = 25 * 60
     @Published var totalSeconds: Int = 25 * 60
     @Published var completedCycles: Int = 0
 
-    // MARK: - Ajustes de Tiempo (en minutos)
-    @AppStorage("focusMinutes") var focusMinutes: Int = 25
-    @AppStorage("shortBreakMinutes") var shortBreakMinutes: Int = 5
-    @AppStorage("longBreakMinutes") var longBreakMinutes: Int = 15
-    @AppStorage("cycleTarget") var cycleTarget: Int = 4
-    @AppStorage("soundEnabled") var soundEnabled: Bool = true
-    @AppStorage("hapticEnabled") var hapticEnabled: Bool = true
+    // MARK: - Ajustes de Tiempo (Reactivos y persistidos en UserDefaults)
+    @Published var focusMinutes: Int {
+        didSet {
+            UserDefaults.standard.set(focusMinutes, forKey: "focusMinutes")
+            if !isRunning && mode == .focus {
+                applyModeDuration(for: .focus)
+            }
+        }
+    }
 
-    // MARK: - Estadísticas y Cesta (UserDefaults)
-    @AppStorage("todayMinutes") var todayMinutes: Int = 0
-    @AppStorage("todayTomatoes") var todayTomatoes: Int = 0
-    @AppStorage("totalMinutes") var totalMinutes: Int = 0
-    @AppStorage("totalTomatoes") var totalTomatoes: Int = 0
-    @AppStorage("lastDateString") private var lastDateString: String = ""
+    @Published var shortBreakMinutes: Int {
+        didSet {
+            UserDefaults.standard.set(shortBreakMinutes, forKey: "shortBreakMinutes")
+            if !isRunning && mode == .shortBreak {
+                applyModeDuration(for: .shortBreak)
+            }
+        }
+    }
+
+    @Published var longBreakMinutes: Int {
+        didSet {
+            UserDefaults.standard.set(longBreakMinutes, forKey: "longBreakMinutes")
+            if !isRunning && mode == .longBreak {
+                applyModeDuration(for: .longBreak)
+            }
+        }
+    }
+
+    @Published var cycleTarget: Int {
+        didSet { UserDefaults.standard.set(cycleTarget, forKey: "cycleTarget") }
+    }
+
+    @Published var soundEnabled: Bool {
+        didSet { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") }
+    }
+
+    @Published var hapticEnabled: Bool {
+        didSet { UserDefaults.standard.set(hapticEnabled, forKey: "hapticEnabled") }
+    }
+
+    // MARK: - Estadísticas y Cesta (Reactivos y persistidos en UserDefaults)
+    @Published var todayMinutes: Int {
+        didSet { UserDefaults.standard.set(todayMinutes, forKey: "todayMinutes") }
+    }
+
+    @Published var todayTomatoes: Int {
+        didSet { UserDefaults.standard.set(todayTomatoes, forKey: "todayTomatoes") }
+    }
+
+    @Published var totalMinutes: Int {
+        didSet { UserDefaults.standard.set(totalMinutes, forKey: "totalMinutes") }
+    }
+
+    @Published var totalTomatoes: Int {
+        didSet { UserDefaults.standard.set(totalTomatoes, forKey: "totalTomatoes") }
+    }
 
     private var targetEndTime: Date?
     private var timerSubscription: Timer?
     private let notificationId = "pomocute_timer_notification"
 
     init() {
+        let defaults = UserDefaults.standard
+        let fM = defaults.integer(forKey: "focusMinutes")
+        self.focusMinutes = fM > 0 ? fM : 25
+
+        let sM = defaults.integer(forKey: "shortBreakMinutes")
+        self.shortBreakMinutes = sM > 0 ? sM : 5
+
+        let lM = defaults.integer(forKey: "longBreakMinutes")
+        self.longBreakMinutes = lM > 0 ? lM : 15
+
+        let cT = defaults.integer(forKey: "cycleTarget")
+        self.cycleTarget = cT > 0 ? cT : 4
+
+        self.soundEnabled = defaults.object(forKey: "soundEnabled") == nil ? true : defaults.bool(forKey: "soundEnabled")
+        self.hapticEnabled = defaults.object(forKey: "hapticEnabled") == nil ? true : defaults.bool(forKey: "hapticEnabled")
+
+        self.todayMinutes = defaults.integer(forKey: "todayMinutes")
+        self.todayTomatoes = defaults.integer(forKey: "todayTomatoes")
+        self.totalMinutes = defaults.integer(forKey: "totalMinutes")
+        self.totalTomatoes = defaults.integer(forKey: "totalTomatoes")
+
         checkAndResetDailyStats()
         applyModeDuration(for: .focus)
     }
@@ -145,6 +208,7 @@ final class TimerViewModel: ObservableObject {
     }
 
     private func tick() {
+        checkAndResetDailyStats()
         guard isRunning, let target = targetEndTime else { return }
         let diff = Int(ceil(target.timeIntervalSinceNow))
         if diff <= 0 {
@@ -207,10 +271,11 @@ final class TimerViewModel: ObservableObject {
 
     private func checkAndResetDailyStats() {
         let todayStr = getTodayString()
-        if lastDateString != todayStr {
+        let lastDate = UserDefaults.standard.string(forKey: "lastDateString") ?? ""
+        if lastDate != todayStr {
             todayMinutes = 0
             todayTomatoes = 0
-            lastDateString = todayStr
+            UserDefaults.standard.set(todayStr, forKey: "lastDateString")
         }
     }
 

@@ -3,6 +3,7 @@ import SwiftUI
 struct TomatoMascotView: View {
     @State private var isBouncing = false
     @State private var isBlinking = false
+    @State private var blinkTimer: Timer?
 
     var body: some View {
         ZStack {
@@ -105,12 +106,17 @@ struct TomatoMascotView: View {
             }
         }
         .onAppear {
-            Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
+            blinkTimer?.invalidate()
+            blinkTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { _ in
                 withAnimation(.easeInOut(duration: 0.1)) { isBlinking = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
                     withAnimation(.easeInOut(duration: 0.1)) { isBlinking = false }
                 }
             }
+        }
+        .onDisappear {
+            blinkTimer?.invalidate()
+            blinkTimer = nil
         }
     }
 }
