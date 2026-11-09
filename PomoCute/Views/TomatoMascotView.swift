@@ -8,21 +8,21 @@ struct TomatoMascotView: View {
     var body: some View {
         ZStack {
             // Hojitas verdes superiores
-            VStack(spacing: -10) {
-                HStack(spacing: 4) {
+            VStack(spacing: -8) {
+                HStack(spacing: 3) {
                     Capsule()
                         .fill(Color(red: 0.35, green: 0.78, blue: 0.45))
-                        .frame(width: 14, height: 26)
+                        .frame(width: 11, height: 20)
                         .rotationEffect(.degrees(-32))
                     Capsule()
                         .fill(Color(red: 0.35, green: 0.78, blue: 0.45))
-                        .frame(width: 16, height: 30)
+                        .frame(width: 13, height: 24)
                     Capsule()
                         .fill(Color(red: 0.35, green: 0.78, blue: 0.45))
-                        .frame(width: 14, height: 26)
+                        .frame(width: 11, height: 20)
                         .rotationEffect(.degrees(32))
                 }
-                .offset(y: -4)
+                .offset(y: -3)
 
                 // Cuerpo del Tomate Kawaii
                 ZStack {
@@ -34,35 +34,35 @@ struct TomatoMascotView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 82, height: 82)
-                        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+                        .frame(width: 68, height: 68)
+                        .shadow(color: Color.black.opacity(0.08), radius: 5, x: 0, y: 2)
 
                     // Brillo en la cabeza
                     Circle()
                         .fill(Color.white.opacity(0.35))
-                        .frame(width: 16, height: 16)
-                        .offset(x: -20, y: -20)
+                        .frame(width: 13, height: 13)
+                        .offset(x: -16, y: -16)
 
                     // Carita Kawaii
-                    HStack(spacing: 14) {
+                    HStack(spacing: 11) {
                         // Ojo Izquierdo
                         VStack {
                             if isBlinking {
                                 Capsule()
                                     .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
-                                    .frame(width: 7, height: 2)
+                                    .frame(width: 6, height: 2)
                             } else {
                                 Circle()
                                     .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
-                                    .frame(width: 7, height: 7)
+                                    .frame(width: 6, height: 6)
                             }
                         }
 
                         // Boca sonriente
                         Circle()
                             .trim(from: 0.05, to: 0.45)
-                            .stroke(Color(red: 0.3, green: 0.15, blue: 0.2), lineWidth: 2.2)
-                            .frame(width: 12, height: 12)
+                            .stroke(Color(red: 0.3, green: 0.15, blue: 0.2), lineWidth: 2.0)
+                            .frame(width: 10, height: 10)
                             .rotationEffect(.degrees(180))
                             .offset(y: 2)
 
@@ -71,30 +71,30 @@ struct TomatoMascotView: View {
                             if isBlinking {
                                 Capsule()
                                     .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
-                                    .frame(width: 7, height: 2)
+                                    .frame(width: 6, height: 2)
                             } else {
                                 Circle()
                                     .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
-                                    .frame(width: 7, height: 7)
+                                    .frame(width: 6, height: 6)
                             }
                         }
                     }
 
                     // Mejillas sonrosadas (Blush)
-                    HStack(spacing: 34) {
+                    HStack(spacing: 28) {
                         Circle()
                             .fill(Color(red: 1.0, green: 0.70, blue: 0.76).opacity(0.85))
-                            .frame(width: 11, height: 8)
+                            .frame(width: 9, height: 7)
                         Circle()
                             .fill(Color(red: 1.0, green: 0.70, blue: 0.76).opacity(0.85))
-                            .frame(width: 11, height: 8)
+                            .frame(width: 9, height: 7)
                     }
-                    .offset(y: 5)
+                    .offset(y: 4)
                 }
             }
         }
-        .scaleEffect(isBouncing ? 1.18 : 1.0)
-        .rotationEffect(.degrees(isBouncing ? 6 : 0))
+        .scaleEffect(isBouncing ? 1.15 : 1.0)
+        .rotationEffect(.degrees(isBouncing ? 5 : 0))
         .onTapGesture {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.45)) {
                 isBouncing = true
