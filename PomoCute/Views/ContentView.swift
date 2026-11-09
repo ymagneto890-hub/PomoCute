@@ -31,33 +31,18 @@ struct ContentView: View {
 
                     Spacer()
 
-                    HStack(spacing: 10) {
-                        // Botón Cesta (Burbuja circular)
-                        Button(action: {
-                            vm.playPop()
-                            showBasket = true
-                        }) {
-                            Text("🧺")
-                                .font(.system(size: 16))
-                                .frame(width: 38, height: 38)
-                                .background(Color.white)
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.06), radius: 5, x: 0, y: 2)
-                        }
-
-                        // Botón Ajustes (Burbuja circular)
-                        Button(action: {
-                            vm.playPop()
-                            showSettings = true
-                        }) {
-                            Image(systemName: "gearshape.fill")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.40))
-                                .frame(width: 38, height: 38)
-                                .background(Color.white)
-                                .clipShape(Circle())
-                                .shadow(color: Color.black.opacity(0.06), radius: 5, x: 0, y: 2)
-                        }
+                    // Botón Ajustes (Burbuja circular única a la derecha)
+                    Button(action: {
+                        vm.playPop()
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.40))
+                            .frame(width: 40, height: 40)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.06), radius: 5, x: 0, y: 2)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -210,35 +195,54 @@ struct ContentView: View {
                     }
                 }
 
-                // MARK: - Resumen Inferior Cesta con Horas Acumuladas
+                // MARK: - Tarjeta Inferior de Cesta e Histórico (Espaciosa y con Altura Cómoda)
                 Button(action: {
                     vm.playPop()
                     showBasket = true
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 12) {
+                        // Icono Cesta Destacado
                         Text("🧺")
-                            .font(.system(size: 14))
-                        Text("Hoy: \(vm.todayTomatoes) 🍅")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(red: 1.0, green: 0.40, blue: 0.52))
-                        Text("•")
-                            .foregroundColor(Color.gray.opacity(0.5))
-                        Text(vm.formatMinutesHours(vm.todayMinutes))
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.30))
-                        if vm.totalMinutes > 0 {
-                            Text("(\(vm.formatMinutesHours(vm.totalMinutes)) total)")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(Color.gray)
+                            .font(.system(size: 22))
+                            .frame(width: 42, height: 42)
+                            .background(Color(red: 1.0, green: 0.92, blue: 0.95))
+                            .clipShape(Circle())
+
+                        // Información de Hoy y Total
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text("Hoy: \(vm.todayTomatoes) 🍅")
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundColor(Color(red: 1.0, green: 0.38, blue: 0.50))
+                                Text("•")
+                                    .foregroundColor(Color.gray.opacity(0.4))
+                                Text(vm.formatMinutesHours(vm.todayMinutes))
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.30))
+                            }
+
+                            Text("Histórico: \(vm.formatMinutesHours(vm.totalMinutes)) • Toca para ver cesta")
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(Color(red: 0.55, green: 0.45, blue: 0.50))
+                                .lineLimit(1)
                         }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(Color(red: 0.70, green: 0.60, blue: 0.65))
+                            .padding(.trailing, 2)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
-                    .background(Color.white.opacity(0.85))
-                    .cornerRadius(18)
-                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.white.opacity(0.92))
+                    .cornerRadius(20)
+                    .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 3)
                 }
-                .padding(.bottom, 12)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 14)
             }
         }
         .sheet(isPresented: $showBasket) {

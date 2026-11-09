@@ -2,6 +2,8 @@ import SwiftUI
 import UserNotifications
 
 class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationDelegate()
+
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -16,11 +18,10 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
 struct PomoCuteApp: App {
     @StateObject private var timerVM = TimerViewModel()
     @Environment(\.scenePhase) private var scenePhase
-    private let notificationDelegate = NotificationDelegate()
 
     init() {
         let center = UNUserNotificationCenter.current()
-        center.delegate = notificationDelegate
+        center.delegate = NotificationDelegate.shared
         center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
