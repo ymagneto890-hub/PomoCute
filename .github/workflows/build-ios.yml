@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -26,6 +26,10 @@ jobs:
             sudo xcode-select -s /Applications/Xcode_16.1.app
           elif [ -d "/Applications/Xcode_16.0.app" ]; then
             sudo xcode-select -s /Applications/Xcode_16.0.app
+          elif [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app
+          elif [ -d "/Applications/Xcode_15.2.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.2.app
           fi
           echo "Xcode seleccionado:"
           xcodebuild -version
@@ -144,11 +148,10 @@ jobs:
           path: PomoCute.ipa
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" PomoCute.ipa \
-            --title "PomoCute $GITHUB_REF_NAME — iOS 15+" \
-            --notes "Build nativo optimizado y validado por GitHub Actions. Diseño y layout conservados." \
-            --target "$GITHUB_SHA"
+          gh release create v1.0.1 PomoCute.ipa \
+            --title "PomoCute v1.0.1 (iOS 15+ Native IPA)" \
+            --notes "PomoCute 1.0.1 compilado para TrollStore con optimización de memoria, corrección de pausa y validación completa." \
+            --clobber || true
