@@ -148,23 +148,28 @@ struct ContentView: View {
                     }
                 }
 
-                // Indicador de 4 ciclos (tomatitos)
+                // MARK: - Indicador Fijo de Ciclos (Sin saltos ni desplazamientos)
                 HStack(spacing: 8) {
                     ForEach(0..<vm.cycleTarget, id: \.self) { index in
-                        if index < (vm.completedCycles % vm.cycleTarget) {
-                            Text("🍅")
-                                .font(.system(size: 16))
-                        } else if index == (vm.completedCycles % vm.cycleTarget) && vm.mode == .focus {
-                            Text("🍅")
-                                .font(.system(size: 16))
-                                .scaleEffect(1.2)
-                        } else {
-                            Circle()
-                                .fill(Color.white.opacity(0.9))
-                                .frame(width: 12, height: 12)
+                        ZStack {
+                            if index < (vm.completedCycles % vm.cycleTarget) {
+                                Text("🍅")
+                                    .font(.system(size: 16))
+                            } else if index == (vm.completedCycles % vm.cycleTarget) {
+                                // Muestra siempre el tomatito del ciclo actual en Enfoque, Corto y Largo
+                                Text("🍅")
+                                    .font(.system(size: 16))
+                                    .scaleEffect(1.15)
+                            } else {
+                                Circle()
+                                    .fill(Color.white.opacity(0.85))
+                                    .frame(width: 12, height: 12)
+                            }
                         }
+                        .frame(width: 24, height: 24)
                     }
                 }
+                .frame(height: 28)
                 .padding(.top, 4)
 
                 Spacer(minLength: 4)
