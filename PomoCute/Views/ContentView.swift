@@ -245,6 +245,11 @@ struct ContentView: View {
         } message: {
             Text("Sin notificaciones no sonará el aviso con la pantalla bloqueada.")
         }
+        .alert("PomoCute", isPresented: $vm.showingCompletionAlert) {
+            Button("Aceptar", role: .cancel) {}
+        } message: {
+            Text(vm.completionAlertMessage)
+        }
         .preferredColorScheme(.light)
     }
 }

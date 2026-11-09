@@ -62,8 +62,14 @@ final class TimerViewModel: ObservableObject {
     @Published var isRunning: Bool = false
     @Published var remainingSeconds: Int = 25 * 60
     @Published var totalSeconds: Int = 25 * 60
-    @Published var completedCycles: Int = 0
+    @Published var completedCycles: Int = 0 {
+        didSet {
+            UserDefaults.standard.set(completedCycles, forKey: Keys.completedCycles)
+        }
+    }
     @Published var notificationsDenied: Bool = false
+    @Published var showingCompletionAlert: Bool = false
+    @Published var completionAlertMessage: String = ""
 
     // MARK: - Ajustes de Tiempo (Reactivos y persistidos en UserDefaults)
     @Published var focusMinutes: Int {
@@ -98,7 +104,16 @@ final class TimerViewModel: ObservableObject {
     }
 
     @Published var soundEnabled: Bool {
-        didSet { UserDefaults.standard.set(soundEnabled, forKey: Keys.soundEnabled) }
+        didSet {
+            UserDefaults.standard.set(soundEnabled, forKey: Keys.soundEnabled)
+            // Si el temporizador está corriendo y cambia el sonido, actualizar la notificación pendiente
+            if isRunning, let target = targetEndTime {
+                let remaining = Int(ceil(target.timeIntervalSinceNow))
+                if remaining > 0 {
+                    scheduleNativeAlarm(seconds: remaining)
+                }
+            }
+        }
     }
 
     @Published var hapticEnabled: Bool {
@@ -125,6 +140,13 @@ final class TimerViewModel: ObservableObject {
     private var targetEndTime: Date?
     private var timerSubscription: Timer?
     private let notificationId = "pomocute_timer_notification"
+
+    // Recursos de sonido del bundle (.caf)
+    private var popSoundID: SystemSoundID = 0
+    private var bellSoundID: SystemSoundID = 0
+
+    // Observador de cambio de día a medianoche
+    private var dayChangeObserver: NSObjectProtocol?
 
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -185,10 +207,50 @@ final class TimerViewModel: ObservableObject {
                 finishCycle(credited: true, alert: false)
             }
         }
+
+        loadCustomSounds()
+        setupDayChangeObserver()
     }
 
     deinit {
         timerSubscription?.invalidate()
+        if let observer = dayChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if popSoundID != 0 {
+            AudioServicesDisposeSystemSoundID(popSoundID)
+        }
+        if bellSoundID != 0 {
+            AudioServicesDisposeSystemSoundID(bellSoundID)
+        }
+    }
+
+    // MARK: - Carga de Sonidos Propios
+    private func loadCustomSounds() {
+        if let popURL = soundResourceURL(named: "pop") {
+            AudioServicesCreateSystemSoundID(popURL as CFURL, &popSoundID)
+        }
+        if let bellURL = soundResourceURL(named: "bell") {
+            AudioServicesCreateSystemSoundID(bellURL as CFURL, &bellSoundID)
+        }
+    }
+
+    private func soundResourceURL(named name: String) -> URL? {
+        if let url = Bundle.main.url(forResource: name, withExtension: "caf") {
+            return url
+        }
+        return Bundle.main.url(forResource: name, withExtension: "caf", subdirectory: "Audio")
+    }
+
+    // MARK: - Observador de Cambio de Fecha (Medianoche)
+    private func setupDayChangeObserver() {
+        dayChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSCalendarDayChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.checkAndResetDailyStats()
+        }
     }
 
     // MARK: - Persistencia de Estado del Temporizador
@@ -317,6 +379,10 @@ final class TimerViewModel: ObservableObject {
         if alert {
             playChime()
             triggerHaptic()
+            completionAlertMessage = (mode == .focus)
+                ? "¡Sesión de Enfoque completada! Toca descansar un ratito 🍵"
+                : "¡Descanso terminado! Listo para concentrarte 🍅"
+            showingCompletionAlert = true
         }
         cancelNativeAlarm()
         checkAndResetDailyStats()
@@ -366,6 +432,7 @@ final class TimerViewModel: ObservableObject {
             todayMinutes = 0
             todayTomatoes = 0
             completedCycles = 0
+            UserDefaults.standard.set(0, forKey: Keys.completedCycles)
             UserDefaults.standard.set(todayStr, forKey: Keys.lastDateString)
         }
     }
@@ -392,7 +459,13 @@ final class TimerViewModel: ObservableObject {
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, seconds)), repeats: false)
         let request = UNNotificationRequest(identifier: notificationId, content: content, trigger: trigger)
-        center.add(request)
+        center.add(request) { error in
+            if let error = error {
+                #if DEBUG
+                print("[PomoCute] Error al programar la notificación: \(error.localizedDescription)")
+                #endif
+            }
+        }
     }
 
     private func cancelNativeAlarm() {
@@ -404,12 +477,16 @@ final class TimerViewModel: ObservableObject {
     // MARK: - Sonidos y Hápticos
     func playPop() {
         guard soundEnabled else { return }
-        AudioServicesPlaySystemSound(1057) // Pop sutil del sistema
+        if popSoundID != 0 {
+            AudioServicesPlaySystemSound(popSoundID)
+        }
     }
 
     func playChime() {
         guard soundEnabled else { return }
-        AudioServicesPlaySystemSound(1025) // Campanita dulce de alerta
+        if bellSoundID != 0 {
+            AudioServicesPlaySystemSound(bellSoundID)
+        }
     }
 
     func triggerHaptic() {

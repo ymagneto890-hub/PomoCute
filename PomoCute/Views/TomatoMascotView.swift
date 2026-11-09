@@ -105,19 +105,21 @@ struct TomatoMascotView: View {
             }
         }
         .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 6_000_000_000)
-                await MainActor.run {
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(nanoseconds: 6_000_000_000)
+                    try Task.checkCancellation()
                     withAnimation(.easeInOut(duration: 0.1)) {
                         isBlinking = true
                     }
-                }
-                try? await Task.sleep(nanoseconds: 180_000_000)
-                await MainActor.run {
+                    try await Task.sleep(nanoseconds: 180_000_000)
+                    try Task.checkCancellation()
                     withAnimation(.easeInOut(duration: 0.1)) {
                         isBlinking = false
                     }
                 }
+            } catch {
+                // Tarea cancelada al desmontarse la vista, sin operaciones pendientes
             }
         }
     }

@@ -7,10 +7,18 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Verify AppIcon Assets
+        run: |
+          if [ ! -f "PomoCute/Assets.xcassets/AppIcon.appiconset/AppIcon.png" ]; then
+            echo "ERROR: AppIcon.png no encontrado en PomoCute/Assets.xcassets/AppIcon.appiconset/"
+            exit 1
+          fi
+          echo "Catálogo AppIcon verificado correctamente."
 
       - name: Install XcodeGen
         run: which xcodegen || brew install xcodegen
@@ -33,6 +41,10 @@ jobs:
           mkdir -p Payload
           cp -r PomoCute.xcarchive/Products/Applications/PomoCute.app Payload/
           zip -r PomoCute.ipa Payload
+
+          echo "=== MEDICIÓN DE TAMAÑO ==="
+          ls -lh Payload/PomoCute.app/PomoCute
+          du -sh Payload/PomoCute.app
           ls -lh PomoCute.ipa
 
       - name: Upload IPA Artifact
