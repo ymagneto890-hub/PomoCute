@@ -121,7 +121,6 @@ struct ContentView: View {
                         Text(vm.formattedTime())
                             .font(.system(size: 44, weight: .black, design: .monospaced))
                             .foregroundColor(Color(red: 0.22, green: 0.15, blue: 0.18))
-                            .contentTransition(.numericText())
 
                         // Ajustador Rápido (- / +)
                         HStack(spacing: 12) {
