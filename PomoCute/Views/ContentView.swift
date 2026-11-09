@@ -19,7 +19,7 @@ struct ContentView: View {
                 .animation(.easeInOut(duration: 0.3), value: vm.mode)
 
             VStack(spacing: 16) {
-                // MARK: - Barra Superior Compacta (iPhone SE)
+                // MARK: - Barra Superior Espaciosa y Limpia (iPhone SE)
                 HStack {
                     HStack(spacing: 6) {
                         Text("🌸")
@@ -31,41 +31,37 @@ struct ContentView: View {
 
                     Spacer()
 
-                    // Chip Rápido de Cesta
-                    Button(action: {
-                        vm.playPop()
-                        showBasket = true
-                    }) {
-                        HStack(spacing: 5) {
+                    HStack(spacing: 10) {
+                        // Botón Cesta (Burbuja circular)
+                        Button(action: {
+                            vm.playPop()
+                            showBasket = true
+                        }) {
                             Text("🧺")
-                                .font(.system(size: 14))
-                            Text(vm.formatMinutesHours(vm.todayMinutes))
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(.system(size: 16))
+                                .frame(width: 38, height: 38)
+                                .background(Color.white)
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.06), radius: 5, x: 0, y: 2)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.white)
-                        .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.30))
-                        .cornerRadius(20)
-                        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-                    }
 
-                    // Botón Ajustes
-                    Button(action: {
-                        vm.playPop()
-                        showSettings = true
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.40))
-                            .padding(8)
-                            .background(Color.white)
-                            .clipShape(Circle())
-                            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                        // Botón Ajustes (Burbuja circular)
+                        Button(action: {
+                            vm.playPop()
+                            showSettings = true
+                        }) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(Color(red: 0.45, green: 0.35, blue: 0.40))
+                                .frame(width: 38, height: 38)
+                                .background(Color.white)
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.06), radius: 5, x: 0, y: 2)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 4)
+                .padding(.top, 14)
 
                 // MARK: - Selector de Modos Píldora Kawaii
                 HStack(spacing: 4) {
@@ -209,26 +205,33 @@ struct ContentView: View {
                     }
                 }
 
-                // MARK: - Resumen Inferior Cesta
+                // MARK: - Resumen Inferior Cesta con Horas Acumuladas
                 Button(action: {
                     vm.playPop()
                     showBasket = true
                 }) {
                     HStack(spacing: 6) {
-                        Text("🧺 Cosecha de hoy:")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(Color.gray)
-                        Text("\(vm.todayTomatoes) tomatitos")
+                        Text("🧺")
+                            .font(.system(size: 14))
+                        Text("Hoy: \(vm.todayTomatoes) 🍅")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundColor(Color(red: 1.0, green: 0.40, blue: 0.52))
-                        Text("(\(vm.todayMinutes) min)")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color.gray)
+                        Text("•")
+                            .foregroundColor(Color.gray.opacity(0.5))
+                        Text(vm.formatMinutesHours(vm.todayMinutes))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.30))
+                        if vm.totalMinutes > 0 {
+                            Text("(\(vm.formatMinutesHours(vm.totalMinutes)) total)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color.gray)
+                        }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.white.opacity(0.75))
-                    .cornerRadius(16)
+                    .padding(.vertical, 9)
+                    .background(Color.white.opacity(0.85))
+                    .cornerRadius(18)
+                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
                 }
                 .padding(.bottom, 12)
             }
