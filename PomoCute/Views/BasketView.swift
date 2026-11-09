@@ -13,7 +13,7 @@ struct BasketView: View {
             HStack {
                 Text("🧺 Tu Cesta de Enfoque")
                     .font(.system(size: 19, weight: .black, design: .rounded))
-                    .foregroundColor(Color(red: 0.25, green: 0.18, blue: 0.22)) // ¡Oscuro y perfectamente visible!
+                    .foregroundColor(Color(red: 0.25, green: 0.18, blue: 0.22))
 
                 Spacer()
 
@@ -60,6 +60,8 @@ struct BasketView: View {
                             Text(vm.formatMinutesHours(vm.totalMinutes))
                                 .font(.system(size: 22, weight: .bold, design: .rounded))
                                 .foregroundColor(Color(red: 0.25, green: 0.18, blue: 0.22))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             Text("Total Acumulado Histórico")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(Color.gray)
@@ -89,15 +91,16 @@ struct BasketView: View {
                                         .stroke(Color(red: 1.0, green: 0.82, blue: 0.87), lineWidth: 1.5)
                                 )
 
-                            if vm.todayTomatoes == 0 {
+                            if vm.todayTomatoes <= 0 {
                                 Text("¡Empieza una sesión de enfoque para cosechar tu primer tomatito! 🍅🌱")
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(Color.gray)
                                     .multilineTextAlignment(.center)
                                     .padding(24)
                             } else {
+                                let displayedTomatoes = min(max(0, vm.todayTomatoes), 40)
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 36))], spacing: 10) {
-                                    ForEach(0..<min(vm.todayTomatoes, 40), id: \.self) { _ in
+                                    ForEach(0..<displayedTomatoes, id: \.self) { _ in
                                         Text("🍅")
                                             .font(.system(size: 24))
                                     }
@@ -174,6 +177,8 @@ struct StatCard: View {
             Text(value)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(Color(red: 0.25, green: 0.18, blue: 0.22))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Text(label)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(Color.gray)

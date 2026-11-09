@@ -119,6 +119,7 @@ final class TimerViewModel: ObservableObject {
     private var targetEndTime: Date?
     private var timerSubscription: Timer?
     private let notificationId = "pomocute_timer_notification"
+    private let hapticGenerator = UIImpactFeedbackGenerator(style: .medium)
 
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -172,9 +173,11 @@ final class TimerViewModel: ObservableObject {
         scheduleNativeAlarm(seconds: remainingSeconds)
 
         timerSubscription?.invalidate()
-        timerSubscription = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             self?.tick()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        timerSubscription = timer
     }
 
     func pause() {
@@ -321,9 +324,8 @@ final class TimerViewModel: ObservableObject {
 
     func triggerHaptic() {
         guard hapticEnabled else { return }
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.prepare()
-        generator.impactOccurred()
+        hapticGenerator.prepare()
+        hapticGenerator.impactOccurred()
     }
 
     func formattedTime() -> String {

@@ -61,6 +61,7 @@ struct SettingsView: View {
 
                 Section {
                     Button(role: .destructive, action: {
+                        vm.playPop()
                         vm.focusMinutes = 25
                         vm.shortBreakMinutes = 5
                         vm.longBreakMinutes = 15
@@ -80,6 +81,7 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Listo") {
+                        vm.playPop()
                         dismiss()
                     }
                     .font(.system(size: 15, weight: .bold))
@@ -87,5 +89,6 @@ struct SettingsView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
     }
 }
