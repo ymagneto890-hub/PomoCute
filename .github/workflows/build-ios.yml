@@ -2,7 +2,7 @@ name: Build PomoCute iOS IPA
 
 on:
   push:
-    branches: [ main, master, fix/iphone-se-lightweight ]
+    branches: [ main, master ]
     tags: [ "v*" ]
   workflow_dispatch:
 
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
