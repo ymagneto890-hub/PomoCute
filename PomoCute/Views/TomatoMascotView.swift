@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct TomatoMascotView: View {
+    @Environment(\\.scenePhase) private var scenePhase
     @State private var isBouncing = false
     @State private var isBlinking = false
 
@@ -104,7 +105,11 @@ struct TomatoMascotView: View {
                 }
             }
         }
-        .task {
+        .task(id: scenePhase) {
+            guard scenePhase == .active else {
+                isBlinking = false
+                return
+            }
             do {
                 while !Task.isCancelled {
                     try await Task.sleep(nanoseconds: 6_000_000_000)
@@ -119,7 +124,7 @@ struct TomatoMascotView: View {
                     }
                 }
             } catch {
-                // Tarea cancelada al desmontarse la vista, sin operaciones pendientes
+                // Task is cancelled when the view disappears or the app leaves the foreground.
             }
         }
     }

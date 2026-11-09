@@ -409,7 +409,9 @@ final class TimerViewModel: ObservableObject {
         guard secs > 0 else { tick(); return }
         let first = target.addingTimeInterval(-(ceil(secs) - 1))   // próximo cambio real de segundo
         let t = Timer(fire: first, interval: 1.0, repeats: true) { [weak self] _ in self?.tick() }
-        t.tolerance = 0.1
+        // The display is derived from targetEndTime, not decremented per tick.
+        // A wider tolerance lets iOS coalesce wakeups without accumulating timer drift.
+        t.tolerance = 0.5
         RunLoop.main.add(t, forMode: .common)
         timerSubscription = t
     }

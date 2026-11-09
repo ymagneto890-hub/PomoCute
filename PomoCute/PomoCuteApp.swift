@@ -22,7 +22,10 @@ struct PomoCuteApp: App {
     init() {
         let center = UNUserNotificationCenter.current()
         center.delegate = NotificationDelegate.shared
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else { return }
+            center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        }
     }
 
     var body: some Scene {
