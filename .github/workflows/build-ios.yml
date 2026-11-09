@@ -3,6 +3,7 @@ name: Build PomoCute iOS IPA
 on:
   push:
     branches: [ main, master, fix/iphone-se-lightweight ]
+    tags: [ "v*" ]
   workflow_dispatch:
 
 permissions:
@@ -135,11 +136,11 @@ jobs:
           path: PomoCute.ipa
 
       - name: Publish GitHub Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/iphone-se-lightweight'
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create v1.0.1 PomoCute.ipa \
-            --title "PomoCute 1.0.1 — iOS 15+" \
+          gh release create "$GITHUB_REF_NAME" PomoCute.ipa \
+            --title "PomoCute $GITHUB_REF_NAME — iOS 15+" \
             --notes "Build nativo optimizado y validado por GitHub Actions. Diseño y layout conservados." \
             --target "$GITHUB_SHA"
