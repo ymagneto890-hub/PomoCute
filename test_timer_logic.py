@@ -96,11 +96,11 @@ def test_infoplist_and_project_yml():
 def test_audio_assets():
     print("[TEST] Verificacion de archivos de audio .caf:")
     root = os.path.dirname(os.path.abspath(__file__))
+    # Keep one canonical source copy per sound; the IPA workflow places notification
+    # sounds at the bundle root after Xcode packaging.
     audio_paths = [
         os.path.join(root, "PomoCute", "Audio", "bell.caf"),
         os.path.join(root, "PomoCute", "Audio", "pop.caf"),
-        os.path.join(root, "PomoCute", "bell.caf"),
-        os.path.join(root, "PomoCute", "pop.caf"),
     ]
     for p in audio_paths:
         assert os.path.isfile(p), f"Falta archivo de audio: {p}"

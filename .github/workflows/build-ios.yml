@@ -2,8 +2,16 @@ name: Build PomoCute iOS IPA
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, fix/iphone-se-lightweight ]
+    tags: [ "v*" ]
   workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -115,6 +123,10 @@ jobs:
             exit 1
           fi
 
+          # Keep one bundled copy: notification sounds are at the app bundle root.
+          # The source tree retains the originals under PomoCute/Audio for reproducible builds.
+          rm -rf "Payload/PomoCute.app/Audio"
+
           echo "Archivos .caf en PomoCute.app bundle:"
           ls -lh Payload/PomoCute.app/*.caf
 
@@ -130,3 +142,13 @@ jobs:
         with:
           name: PomoCute-Native-IPA
           path: PomoCute.ipa
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" PomoCute.ipa \
+            --title "PomoCute $GITHUB_REF_NAME — iOS 15+" \
+            --notes "Build nativo optimizado y validado por GitHub Actions. Diseño y layout conservados." \
+            --target "$GITHUB_SHA"
