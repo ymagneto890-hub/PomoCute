@@ -192,8 +192,14 @@ final class TimerViewModel: ObservableObject {
         self.completedCycles = defaults.integer(forKey: Keys.completedCycles)
         let savedTotalSeconds = defaults.integer(forKey: Keys.totalSeconds)
         let savedRemainingSeconds = defaults.integer(forKey: Keys.remainingSeconds)
-        let maximumDurationSeconds = 90 * 60
+        let maximumDurationSeconds: Int
+        switch mode {
+        case .focus: maximumDurationSeconds = 90 * 60
+        case .shortBreak: maximumDurationSeconds = 30 * 60
+        case .longBreak: maximumDurationSeconds = 60 * 60
+        }
 
+        self.completedCycles = max(0, self.completedCycles)
         checkAndResetDailyStats()
 
         if savedTotalSeconds > 0 {
