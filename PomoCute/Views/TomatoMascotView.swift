@@ -4,8 +4,6 @@ struct TomatoMascotView: View {
     @State private var isBouncing = false
     @State private var isBlinking = false
 
-    private let blinkPublisher = Timer.publish(every: 4.0, on: .main, in: .common).autoconnect()
-
     var body: some View {
         ZStack {
             // Hojitas verdes superiores
@@ -106,10 +104,20 @@ struct TomatoMascotView: View {
                 }
             }
         }
-        .onReceive(blinkPublisher) { _ in
-            withAnimation(.easeInOut(duration: 0.1)) { isBlinking = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                withAnimation(.easeInOut(duration: 0.1)) { isBlinking = false }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isBlinking = true
+                    }
+                }
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isBlinking = false
+                    }
+                }
             }
         }
     }

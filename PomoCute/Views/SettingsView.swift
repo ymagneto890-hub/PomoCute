@@ -40,11 +40,23 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+
+                    Stepper(value: $vm.cycleTarget, in: 2...8) {
+                        HStack {
+                            Text("🔁 Ciclos hasta descanso largo")
+                                .fontWeight(.semibold)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            Spacer()
+                            Text("\(vm.cycleTarget)")
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
 
                 Section(header: Text("Sonido y Vibración")) {
                     Toggle("Efectos de sonido", isOn: $vm.soundEnabled)
-                    Toggle("Vibración háptica", isOn: $vm.hapticEnabled)
+                    Toggle("Vibración", isOn: $vm.hapticEnabled)
 
                     Button(action: {
                         vm.playChime()
@@ -65,6 +77,7 @@ struct SettingsView: View {
                         vm.focusMinutes = 25
                         vm.shortBreakMinutes = 5
                         vm.longBreakMinutes = 15
+                        vm.cycleTarget = 4
                     }) {
                         HStack {
                             Spacer()

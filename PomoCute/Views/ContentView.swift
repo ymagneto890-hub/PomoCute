@@ -38,6 +38,7 @@ struct ContentView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.black.opacity(0.06), radius: 4, x: 0, y: 2)
                 }
+                .accessibilityLabel("Ajustes")
             }
             .padding(.horizontal, 20)
             .padding(.top, 10)
@@ -81,7 +82,7 @@ struct ContentView: View {
                     .frame(width: 195, height: 195)
                     .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
 
-                // Progreso Circular Suave
+                // Progreso Circular
                 Circle()
                     .trim(from: 0, to: CGFloat(progress))
                     .stroke(
@@ -90,7 +91,6 @@ struct ContentView: View {
                     )
                     .rotationEffect(.degrees(-90))
                     .frame(width: 195, height: 195)
-                    .animation(.linear(duration: 0.25), value: progress)
 
                 // Contenido Central: Mascota + Reloj
                 VStack(spacing: 6) {
@@ -106,15 +106,17 @@ struct ContentView: View {
 
             // MARK: - Indicador Fijo de Ciclos (Sin saltos ni desplazamientos)
             HStack(spacing: 8) {
+                let done = vm.mode == .longBreak ? vm.cycleTarget : vm.completedCycles % vm.cycleTarget
                 ForEach(0..<vm.cycleTarget, id: \.self) { index in
                     ZStack {
-                        if index < (vm.completedCycles % vm.cycleTarget) {
+                        if index < done {
                             Text("🍅")
                                 .font(.system(size: 15))
-                        } else if index == (vm.completedCycles % vm.cycleTarget) {
+                        } else if index == done {
                             Text("🍅")
                                 .font(.system(size: 15))
                                 .scaleEffect(1.15)
+                                .opacity(vm.mode == .focus ? 0.5 : 1.0)
                         } else {
                             Circle()
                                 .fill(Color.white.opacity(0.85))
@@ -140,6 +142,7 @@ struct ContentView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.black.opacity(0.06), radius: 5, x: 0, y: 2)
                 }
+                .accessibilityLabel("Reiniciar")
 
                 // Botón Principal Play / Pause
                 Button(action: vm.toggle) {
@@ -151,6 +154,7 @@ struct ContentView: View {
                         .clipShape(Circle())
                         .shadow(color: vm.mode.accentColor.opacity(0.4), radius: 8, x: 0, y: 4)
                 }
+                .accessibilityLabel(vm.isRunning ? "Pausar" : "Iniciar")
 
                 // Saltar ciclo
                 Button(action: vm.skip) {
@@ -162,6 +166,7 @@ struct ContentView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.black.opacity(0.06), radius: 5, x: 0, y: 2)
                 }
+                .accessibilityLabel("Saltar")
             }
 
             Spacer()
@@ -192,10 +197,11 @@ struct ContentView: View {
                                 .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.30))
                         }
 
-                        Text("Total: \(vm.formatMinutesHours(vm.totalMinutes)) • Toca para abrir cesta")
+                        Text("Total: \(vm.formatMinutesHours(vm.totalMinutes)) • Ver cesta")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundColor(Color(red: 0.55, green: 0.45, blue: 0.50))
                             .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
 
                     Spacer()
@@ -226,6 +232,16 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(vm)
+        }
+        .alert("Notificaciones desactivadas", isPresented: $vm.notificationsDenied) {
+            Button("Abrir Ajustes") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Ahora no", role: .cancel) {}
+        } message: {
+            Text("Sin notificaciones no sonará el aviso con la pantalla bloqueada.")
         }
         .preferredColorScheme(.light)
     }

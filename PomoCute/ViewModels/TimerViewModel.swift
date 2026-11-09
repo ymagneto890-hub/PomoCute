@@ -50,6 +50,11 @@ final class TimerViewModel: ObservableObject {
         static let totalMinutes = "totalMinutes"
         static let totalTomatoes = "totalTomatoes"
         static let lastDateString = "lastDateString"
+        static let mode = "mode"
+        static let totalSeconds = "totalSeconds"
+        static let remainingSeconds = "remainingSeconds"
+        static let completedCycles = "completedCycles"
+        static let targetEnd = "targetEnd"
     }
 
     // MARK: - Estado de Temporizador Reactivo
@@ -58,6 +63,7 @@ final class TimerViewModel: ObservableObject {
     @Published var remainingSeconds: Int = 25 * 60
     @Published var totalSeconds: Int = 25 * 60
     @Published var completedCycles: Int = 0
+    @Published var notificationsDenied: Bool = false
 
     // MARK: - Ajustes de Tiempo (Reactivos y persistidos en UserDefaults)
     @Published var focusMinutes: Int {
@@ -119,11 +125,11 @@ final class TimerViewModel: ObservableObject {
     private var targetEndTime: Date?
     private var timerSubscription: Timer?
     private let notificationId = "pomocute_timer_notification"
-    private let hapticGenerator = UIImpactFeedbackGenerator(style: .medium)
 
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
         return f
     }()
 
@@ -149,12 +155,50 @@ final class TimerViewModel: ObservableObject {
         self.totalMinutes = defaults.integer(forKey: Keys.totalMinutes)
         self.totalTomatoes = defaults.integer(forKey: Keys.totalTomatoes)
 
+        if let savedModeStr = defaults.string(forKey: Keys.mode), let savedMode = PomodoroMode(rawValue: savedModeStr) {
+            self.mode = savedMode
+        } else {
+            self.mode = .focus
+        }
+        self.completedCycles = defaults.integer(forKey: Keys.completedCycles)
+        let savedTotalSeconds = defaults.integer(forKey: Keys.totalSeconds)
+        let savedRemainingSeconds = defaults.integer(forKey: Keys.remainingSeconds)
+
         checkAndResetDailyStats()
-        applyModeDuration(for: .focus)
+
+        if savedTotalSeconds > 0 {
+            self.totalSeconds = savedTotalSeconds
+            self.remainingSeconds = savedRemainingSeconds > 0 ? savedRemainingSeconds : savedTotalSeconds
+        } else {
+            applyModeDuration(for: mode)
+        }
+
+        let savedTargetEnd = defaults.double(forKey: Keys.targetEnd)
+        if savedTargetEnd > 0 {
+            let targetDate = Date(timeIntervalSince1970: savedTargetEnd)
+            if targetDate > Date() {
+                self.targetEndTime = targetDate
+                self.isRunning = true
+                self.remainingSeconds = Int(ceil(targetDate.timeIntervalSinceNow))
+                startTicking()
+            } else {
+                finishCycle(credited: true, alert: false)
+            }
+        }
     }
 
     deinit {
         timerSubscription?.invalidate()
+    }
+
+    // MARK: - Persistencia de Estado del Temporizador
+    private func persistTimerState() {
+        let defaults = UserDefaults.standard
+        defaults.set(mode.rawValue, forKey: Keys.mode)
+        defaults.set(totalSeconds, forKey: Keys.totalSeconds)
+        defaults.set(remainingSeconds, forKey: Keys.remainingSeconds)
+        defaults.set(completedCycles, forKey: Keys.completedCycles)
+        defaults.set(targetEndTime?.timeIntervalSince1970 ?? 0, forKey: Keys.targetEnd)
     }
 
     // MARK: - Control de Temporizador
@@ -171,13 +215,16 @@ final class TimerViewModel: ObservableObject {
         isRunning = true
         targetEndTime = Date().addingTimeInterval(TimeInterval(remainingSeconds))
         scheduleNativeAlarm(seconds: remainingSeconds)
+        startTicking()
+        persistTimerState()
 
-        timerSubscription?.invalidate()
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-            self?.tick()
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            if settings.authorizationStatus == .denied {
+                DispatchQueue.main.async {
+                    self?.notificationsDenied = true
+                }
+            }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        timerSubscription = timer
     }
 
     func pause() {
@@ -186,26 +233,31 @@ final class TimerViewModel: ObservableObject {
         timerSubscription?.invalidate()
         timerSubscription = nil
         cancelNativeAlarm()
+        persistTimerState()
     }
 
     func reset() {
         playPop()
         pause()
-        remainingSeconds = totalSeconds
+        applyModeDuration(for: mode)
     }
 
     func skip() {
         playPop()
         pause()
-        handleCycleComplete()
+        finishCycle(credited: false, alert: false)
+    }
+
+    private func switchMode(_ newMode: PomodoroMode) {
+        pause()
+        mode = newMode
+        applyModeDuration(for: newMode)
     }
 
     func setMode(_ newMode: PomodoroMode) {
         guard mode != newMode else { return }
         playPop()
-        pause()
-        mode = newMode
-        applyModeDuration(for: newMode)
+        switchMode(newMode)
     }
 
     private func applyModeDuration(for targetMode: PomodoroMode) {
@@ -217,45 +269,75 @@ final class TimerViewModel: ObservableObject {
         }
         totalSeconds = mins * 60
         remainingSeconds = totalSeconds
+        persistTimerState()
     }
 
-    private func tick() {
+    private func startTicking() {
+        timerSubscription?.invalidate()
+        guard let target = targetEndTime else { return }
+        let secs = target.timeIntervalSinceNow
+        guard secs > 0 else { tick(); return }
+        let first = target.addingTimeInterval(-(ceil(secs) - 1))   // próximo cambio real de segundo
+        let t = Timer(fire: first, interval: 1.0, repeats: true) { [weak self] _ in self?.tick() }
+        t.tolerance = 0.1
+        RunLoop.main.add(t, forMode: .common)
+        timerSubscription = t
+    }
+
+    private func tick(alertOnFinish: Bool = true) {
         guard isRunning, let target = targetEndTime else { return }
         let diff = Int(ceil(target.timeIntervalSinceNow))
         if diff <= 0 {
             remainingSeconds = 0
             pause()
-            handleCycleComplete()
-        } else {
+            finishCycle(credited: true, alert: alertOnFinish)
+        } else if diff != remainingSeconds {
             remainingSeconds = diff
         }
     }
 
-    func appDidBecomeActive() {
-        checkAndResetDailyStats()
-        tick()
+    func appDidEnterBackground() {
+        timerSubscription?.invalidate()
+        timerSubscription = nil
     }
 
-    private func handleCycleComplete() {
-        playChime()
-        triggerHaptic()
+    func appDidBecomeActive() {
+        checkAndResetDailyStats()
+        tick(alertOnFinish: false)
+        if isRunning {
+            startTicking()
+        }
+    }
+
+    private func finishCycle(credited: Bool, alert: Bool) {
+        if alert {
+            playChime()
+            triggerHaptic()
+        }
+        cancelNativeAlarm()
         checkAndResetDailyStats()
 
         if mode == .focus {
-            todayMinutes += focusMinutes
-            todayTomatoes += 1
-            totalMinutes += focusMinutes
-            totalTomatoes += 1
-            completedCycles += 1
+            if credited {
+                let minutesToAdd = totalSeconds / 60
+                todayMinutes += minutesToAdd
+                todayTomatoes += 1
+                totalMinutes += minutesToAdd
+                totalTomatoes += 1
+                completedCycles += 1
 
-            if completedCycles % cycleTarget == 0 {
-                setMode(.longBreak)
+                if completedCycles % cycleTarget == 0 {
+                    switchMode(.longBreak)
+                } else {
+                    switchMode(.shortBreak)
+                }
             } else {
-                setMode(.shortBreak)
+                switchMode(.shortBreak)
             }
         } else {
-            setMode(.focus)
+            switchMode(.focus)
         }
+        persistTimerState()
     }
 
     // MARK: - Limpieza de Histórico
@@ -279,6 +361,7 @@ final class TimerViewModel: ObservableObject {
         if lastDate != todayStr {
             todayMinutes = 0
             todayTomatoes = 0
+            completedCycles = 0
             UserDefaults.standard.set(todayStr, forKey: Keys.lastDateString)
         }
     }
@@ -287,6 +370,7 @@ final class TimerViewModel: ObservableObject {
     private func scheduleNativeAlarm(seconds: Int) {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [notificationId])
+        center.removeDeliveredNotifications(withIdentifiers: [notificationId])
 
         let content = UNMutableNotificationContent()
         switch mode {
@@ -300,7 +384,7 @@ final class TimerViewModel: ObservableObject {
             content.title = "🌙 Descanso largo terminado"
             content.body = "¡Energía recargada! A por el siguiente ciclo 🍅"
         }
-        content.sound = .default
+        content.sound = soundEnabled ? .default : nil
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, seconds)), repeats: false)
         let request = UNNotificationRequest(identifier: notificationId, content: content, trigger: trigger)
@@ -308,7 +392,9 @@ final class TimerViewModel: ObservableObject {
     }
 
     private func cancelNativeAlarm() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notificationId])
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [notificationId])
+        center.removeDeliveredNotifications(withIdentifiers: [notificationId])
     }
 
     // MARK: - Sonidos y Hápticos
@@ -324,8 +410,7 @@ final class TimerViewModel: ObservableObject {
 
     func triggerHaptic() {
         guard hapticEnabled else { return }
-        hapticGenerator.prepare()
-        hapticGenerator.impactOccurred()
+        AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
     }
 
     func formattedTime() -> String {

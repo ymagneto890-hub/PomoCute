@@ -9,8 +9,8 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        // Permite que la notificación suene y muestre banner incluso si la app está abierta en pantalla
-        completionHandler([.banner, .sound, .badge])
+        // Con la app en primer plano, el aviso lo gestiona la propia interfaz de la app
+        completionHandler([])
     }
 }
 
@@ -31,8 +31,13 @@ struct PomoCuteApp: App {
                 .environmentObject(timerVM)
         }
         .onChange(of: scenePhase) { phase in
-            if phase == .active {
+            switch phase {
+            case .active:
                 timerVM.appDidBecomeActive()
+            case .background:
+                timerVM.appDidEnterBackground()
+            default:
+                break
             }
         }
     }
