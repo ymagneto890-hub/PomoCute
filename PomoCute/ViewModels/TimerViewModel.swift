@@ -301,6 +301,10 @@ final class TimerViewModel: ObservableObject {
         timerSubscription = nil
     }
 
+    func appWillResignActive() {
+        persistTimerState()
+    }
+
     func appDidBecomeActive() {
         checkAndResetDailyStats()
         tick(alertOnFinish: false)
