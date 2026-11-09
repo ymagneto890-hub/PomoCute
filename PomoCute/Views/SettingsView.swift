@@ -43,10 +43,9 @@ struct SettingsView: View {
 
                     Stepper(value: $vm.cycleTarget, in: 2...8) {
                         HStack {
-                            Text("🔁 Ciclos hasta descanso largo")
+                            Text("🔁 Ciclos")
                                 .fontWeight(.semibold)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.8)
                             Spacer()
                             Text("\(vm.cycleTarget)")
                                 .foregroundColor(.secondary)

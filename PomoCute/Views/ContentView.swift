@@ -106,17 +106,18 @@ struct ContentView: View {
 
             // MARK: - Indicador Fijo de Ciclos (Sin saltos ni desplazamientos)
             HStack(spacing: 8) {
-                let done = vm.mode == .longBreak ? vm.cycleTarget : vm.completedCycles % vm.cycleTarget
+                let inRound = vm.completedCycles % vm.cycleTarget
+                let done = (vm.mode == .longBreak && inRound == 0 && vm.completedCycles > 0) ? vm.cycleTarget : inRound
                 ForEach(0..<vm.cycleTarget, id: \.self) { index in
                     ZStack {
                         if index < done {
                             Text("🍅")
                                 .font(.system(size: 15))
-                        } else if index == done {
+                        } else if index == done && vm.mode == .focus {
                             Text("🍅")
                                 .font(.system(size: 15))
                                 .scaleEffect(1.15)
-                                .opacity(vm.mode == .focus ? 0.5 : 1.0)
+                                .opacity(0.5)
                         } else {
                             Circle()
                                 .fill(Color.white.opacity(0.85))
