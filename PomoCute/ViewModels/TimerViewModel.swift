@@ -100,7 +100,14 @@ final class TimerViewModel: ObservableObject {
     }
 
     @Published var cycleTarget: Int {
-        didSet { UserDefaults.standard.set(cycleTarget, forKey: Keys.cycleTarget) }
+        didSet {
+            let safeValue = min(max(cycleTarget, 2), 8)
+            if safeValue != cycleTarget {
+                cycleTarget = safeValue
+                return
+            }
+            UserDefaults.standard.set(safeValue, forKey: Keys.cycleTarget)
+        }
     }
 
     @Published var soundEnabled: Bool {
@@ -158,16 +165,16 @@ final class TimerViewModel: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
         let fM = defaults.integer(forKey: Keys.focusMinutes)
-        self.focusMinutes = fM > 0 ? fM : 25
+        self.focusMinutes = fM > 0 ? min(fM, 90) : 25
 
         let sM = defaults.integer(forKey: Keys.shortBreakMinutes)
-        self.shortBreakMinutes = sM > 0 ? sM : 5
+        self.shortBreakMinutes = sM > 0 ? min(sM, 30) : 5
 
         let lM = defaults.integer(forKey: Keys.longBreakMinutes)
-        self.longBreakMinutes = lM > 0 ? lM : 15
+        self.longBreakMinutes = lM > 0 ? min(lM, 60) : 15
 
         let cT = defaults.integer(forKey: Keys.cycleTarget)
-        self.cycleTarget = cT > 0 ? cT : 4
+        self.cycleTarget = cT > 0 ? min(max(cT, 2), 8) : 4
 
         self.soundEnabled = defaults.object(forKey: Keys.soundEnabled) == nil ? true : defaults.bool(forKey: Keys.soundEnabled)
         self.hapticEnabled = defaults.object(forKey: Keys.hapticEnabled) == nil ? true : defaults.bool(forKey: Keys.hapticEnabled)
@@ -185,31 +192,43 @@ final class TimerViewModel: ObservableObject {
         self.completedCycles = defaults.integer(forKey: Keys.completedCycles)
         let savedTotalSeconds = defaults.integer(forKey: Keys.totalSeconds)
         let savedRemainingSeconds = defaults.integer(forKey: Keys.remainingSeconds)
+        let maximumDurationSeconds = 90 * 60
 
         checkAndResetDailyStats()
 
         if savedTotalSeconds > 0 {
-            self.totalSeconds = savedTotalSeconds
-            self.remainingSeconds = savedRemainingSeconds > 0 ? savedRemainingSeconds : savedTotalSeconds
+            self.totalSeconds = min(savedTotalSeconds, maximumDurationSeconds)
+            let restoredRemaining = savedRemainingSeconds > 0 ? savedRemainingSeconds : self.totalSeconds
+            self.remainingSeconds = min(restoredRemaining, self.totalSeconds)
         } else {
             applyModeDuration(for: mode)
         }
 
         let savedTargetEnd = defaults.double(forKey: Keys.targetEnd)
-        if savedTargetEnd > 0 {
+        if savedTargetEnd.isFinite, savedTargetEnd > 0 {
             let targetDate = Date(timeIntervalSince1970: savedTargetEnd)
-            let remaining = Int(ceil(targetDate.timeIntervalSinceNow))
-            if remaining > 0 {
+            let rawRemaining = targetDate.timeIntervalSinceNow
+            // Reject corrupt/future state that exceeds the longest supported focus session.
+            if rawRemaining > 0, rawRemaining <= TimeInterval(maximumDurationSeconds + 5) {
+                let remaining = Int(ceil(rawRemaining))
                 self.targetEndTime = targetDate
                 self.isRunning = true
-                self.remainingSeconds = remaining
+                self.remainingSeconds = min(remaining, self.totalSeconds)
                 startTicking()
-            } else {
+            } else if rawRemaining <= 0 {
                 self.targetEndTime = nil
                 self.isRunning = false
                 self.remainingSeconds = 0
                 finishCycle(credited: true, alert: false)
+            } else {
+                self.targetEndTime = nil
+                self.isRunning = false
+                self.remainingSeconds = self.totalSeconds
+                persistTimerState()
             }
+        } else {
+            self.targetEndTime = nil
+            self.isRunning = false
         }
 
         loadCustomSounds()
@@ -397,7 +416,13 @@ final class TimerViewModel: ObservableObject {
         case .shortBreak: mins = shortBreakMinutes
         case .longBreak: mins = longBreakMinutes
         }
-        totalSeconds = mins * 60
+        let safeMinutes: Int
+        switch targetMode {
+        case .focus: safeMinutes = min(max(mins, 1), 90)
+        case .shortBreak: safeMinutes = min(max(mins, 1), 30)
+        case .longBreak: safeMinutes = min(max(mins, 1), 60)
+        }
+        totalSeconds = safeMinutes * 60
         remainingSeconds = totalSeconds
         persistTimerState()
     }
@@ -409,9 +434,7 @@ final class TimerViewModel: ObservableObject {
         guard secs > 0 else { tick(); return }
         let first = target.addingTimeInterval(-(ceil(secs) - 1))   // próximo cambio real de segundo
         let t = Timer(fire: first, interval: 1.0, repeats: true) { [weak self] _ in self?.tick() }
-        // The display is derived from targetEndTime, not decremented per tick.
-        // A wider tolerance lets iOS coalesce wakeups without accumulating timer drift.
-        t.tolerance = 0.5
+        t.tolerance = 0.1
         RunLoop.main.add(t, forMode: .common)
         timerSubscription = t
     }
