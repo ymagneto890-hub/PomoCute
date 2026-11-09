@@ -104,21 +104,22 @@ struct ContentView: View {
 
             Spacer()
 
-            // MARK: - Indicador Fijo de Ciclos (Sin saltos ni desplazamientos)
+            // MARK: - Indicador Fijo de Ciclos (Siempre al menos 1 tomate y sube según completas)
             HStack(spacing: 8) {
-                let inRound = vm.completedCycles % vm.cycleTarget
-                let done = (vm.mode == .longBreak && inRound == 0 && vm.completedCycles > 0) ? vm.cycleTarget : inRound
+                let activeIndex = vm.completedCycles % vm.cycleTarget
                 ForEach(0..<vm.cycleTarget, id: \.self) { index in
                     ZStack {
-                        if index < done {
+                        if index < activeIndex {
+                            // Tomates completados
                             Text("🍅")
                                 .font(.system(size: 15))
-                        } else if index == done && vm.mode == .focus {
+                        } else if index == activeIndex {
+                            // Tomate del ciclo actual (SIEMPRE presente: igual en Enfoque, Corto y Largo)
                             Text("🍅")
                                 .font(.system(size: 15))
                                 .scaleEffect(1.15)
-                                .opacity(0.5)
                         } else {
+                            // Ciclos pendientes
                             Circle()
                                 .fill(Color.white.opacity(0.85))
                                 .frame(width: 10, height: 10)
