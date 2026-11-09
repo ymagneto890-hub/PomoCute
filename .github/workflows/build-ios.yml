@@ -1,0 +1,132 @@
+name: Build PomoCute iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          if [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app
+          fi
+          echo "Xcode seleccionado:"
+          xcodebuild -version
+
+      - name: Verify AppIcon Assets
+        run: |
+          ICON_DIR="PomoCute/Assets.xcassets/AppIcon.appiconset"
+          if [ ! -d "$ICON_DIR" ] || [ ! -f "$ICON_DIR/Contents.json" ]; then
+            echo "ERROR: Catálogo AppIcon.appiconset no válido o Contents.json ausente."
+            exit 1
+          fi
+          if ! ls "$ICON_DIR"/*.png >/dev/null 2>&1; then
+            echo "ERROR: No se encontraron imágenes PNG en AppIcon.appiconset."
+            exit 1
+          fi
+          echo "Catálogo AppIcon verificado correctamente."
+
+      - name: Verify Audio Assets and Unit Tests
+        run: |
+          if [ ! -f "PomoCute/Audio/bell.caf" ] && [ ! -f "PomoCute/bell.caf" ]; then
+            echo "ERROR: bell.caf no encontrado en las fuentes del repositorio."
+            exit 1
+          fi
+          if [ ! -f "PomoCute/Audio/pop.caf" ] && [ ! -f "PomoCute/pop.caf" ]; then
+            echo "ERROR: pop.caf no encontrado en las fuentes del repositorio."
+            exit 1
+          fi
+          pip3 install pyyaml
+          python3 test_timer_logic.py
+
+      - name: Install Pinned XcodeGen (2.42.0)
+        run: |
+          XCODEGEN_VER="2.42.0"
+          curl -Ls "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VER}/xcodegen.zip" -o xcodegen.zip
+          unzip -q xcodegen.zip
+          cd xcodegen && sudo ./install.sh && cd ..
+          rm -rf xcodegen xcodegen.zip
+          xcodegen --version
+
+      - name: Generate Xcode Project
+        run: |
+          xcodegen generate
+          echo "=== Info.plist generado ==="
+          cat PomoCute/Info.plist
+
+      - name: Build Debug Check
+        run: |
+          xcodebuild -project PomoCute.xcodeproj \
+            -scheme PomoCute \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Build Pure Native iOS IPA (Release)
+        run: |
+          xcodebuild -project PomoCute.xcodeproj \
+            -scheme PomoCute \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath PomoCute.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+          mkdir -p Payload
+          cp -r PomoCute.xcarchive/Products/Applications/PomoCute.app Payload/
+
+          # Garantizar que bell.caf y pop.caf estén en la raíz del bundle para UNNotificationSound
+          if [ ! -f "Payload/PomoCute.app/bell.caf" ]; then
+            if [ -f "Payload/PomoCute.app/Audio/bell.caf" ]; then
+              cp "Payload/PomoCute.app/Audio/bell.caf" "Payload/PomoCute.app/bell.caf"
+            elif [ -f "PomoCute/bell.caf" ]; then
+              cp "PomoCute/bell.caf" "Payload/PomoCute.app/bell.caf"
+            fi
+          fi
+          if [ ! -f "Payload/PomoCute.app/pop.caf" ]; then
+            if [ -f "Payload/PomoCute.app/Audio/pop.caf" ]; then
+              cp "Payload/PomoCute.app/Audio/pop.caf" "Payload/PomoCute.app/pop.caf"
+            elif [ -f "PomoCute/pop.caf" ]; then
+              cp "PomoCute/pop.caf" "Payload/PomoCute.app/pop.caf"
+            fi
+          fi
+
+          # Verificación obligatoria de recursos .caf
+          if [ ! -f "Payload/PomoCute.app/bell.caf" ]; then
+            echo "ERROR CRÍTICO: bell.caf no existe en Payload/PomoCute.app/"
+            exit 1
+          fi
+          if [ ! -f "Payload/PomoCute.app/pop.caf" ]; then
+            echo "ERROR CRÍTICO: pop.caf no existe en Payload/PomoCute.app/"
+            exit 1
+          fi
+
+          echo "Archivos .caf en PomoCute.app bundle:"
+          ls -lh Payload/PomoCute.app/*.caf
+
+          zip -r PomoCute.ipa Payload
+
+          echo "=== MEDICIÓN DE TAMAÑO ==="
+          ls -lh Payload/PomoCute.app/PomoCute
+          du -sh Payload/PomoCute.app
+          ls -lh PomoCute.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PomoCute-Native-IPA
+          path: PomoCute.ipa
