@@ -78,6 +78,8 @@ struct ContentView: View {
                                     .font(.system(size: 14))
                                 Text(m.rawValue)
                                     .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
@@ -239,5 +241,6 @@ struct ContentView: View {
             SettingsView()
                 .environmentObject(vm)
         }
+        .preferredColorScheme(.light)
     }
 }

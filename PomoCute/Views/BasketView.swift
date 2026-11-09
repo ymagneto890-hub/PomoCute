@@ -8,10 +8,37 @@ struct BasketView: View {
     @State private var showConfirmResetTotal = false
 
     var body: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            // MARK: - Barra Superior Personalizada con Contraste Perfecto
+            HStack {
+                Text("🧺 Tu Cesta de Enfoque")
+                    .font(.system(size: 19, weight: .black, design: .rounded))
+                    .foregroundColor(Color(red: 0.25, green: 0.18, blue: 0.22)) // ¡Oscuro y perfectamente visible!
+
+                Spacer()
+
+                Button(action: {
+                    vm.playPop()
+                    dismiss()
+                }) {
+                    Text("Cerrar")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Color(red: 1.0, green: 0.40, blue: 0.52))
+                        .clipShape(Capsule())
+                        .shadow(color: Color(red: 1.0, green: 0.40, blue: 0.52).opacity(0.35), radius: 4, x: 0, y: 2)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
+            .background(Color(red: 0.99, green: 0.96, blue: 0.97))
+
             ScrollView {
-                VStack(spacing: 20) {
-                    // Tarjetas de Estadísticas
+                VStack(spacing: 18) {
+                    // Tarjetas de Estadísticas de Hoy
                     HStack(spacing: 12) {
                         StatCard(
                             icon: "📅",
@@ -34,7 +61,7 @@ struct BasketView: View {
                                 .font(.system(size: 22, weight: .bold, design: .rounded))
                                 .foregroundColor(Color(red: 0.25, green: 0.18, blue: 0.22))
                             Text("Total Acumulado Histórico")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(Color.gray)
                         }
                         Spacer()
@@ -42,20 +69,24 @@ struct BasketView: View {
                     .padding(16)
                     .background(Color.white)
                     .cornerRadius(18)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color(red: 0.94, green: 0.88, blue: 0.90), lineWidth: 1)
+                    )
                     .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
 
                     // Cesta Gráfica de Tomatitos
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
                         Text("Tomatitos cosechados hoy:")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.30))
 
                         ZStack {
                             RoundedRectangle(cornerRadius: 18)
-                                .fill(Color(red: 0.99, green: 0.96, blue: 0.97))
+                                .fill(Color.white)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 18)
-                                        .stroke(Color(red: 1.0, green: 0.85, blue: 0.89), lineWidth: 1.5)
+                                        .stroke(Color(red: 1.0, green: 0.82, blue: 0.87), lineWidth: 1.5)
                                 )
 
                             if vm.todayTomatoes == 0 {
@@ -109,34 +140,24 @@ struct BasketView: View {
                 }
                 .padding(18)
             }
-            .background(Color(red: 0.99, green: 0.97, blue: 0.98).ignoresSafeArea())
-            .navigationTitle("🧺 Tu Cesta de Enfoque")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cerrar") {
-                        dismiss()
-                    }
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(Color(red: 1.0, green: 0.40, blue: 0.52))
-                }
+        }
+        .background(Color(red: 0.99, green: 0.96, blue: 0.97).ignoresSafeArea())
+        .preferredColorScheme(.light)
+        .alert("¿Vaciar cesta de hoy?", isPresented: $showConfirmResetToday) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Vaciar", role: .destructive) {
+                vm.clearTodayStats()
             }
-            .alert("¿Vaciar cesta de hoy?", isPresented: $showConfirmResetToday) {
-                Button("Cancelar", role: .cancel) {}
-                Button("Vaciar", role: .destructive) {
-                    vm.clearTodayStats()
-                }
-            } message: {
-                Text("Se pondrán a 0 los tomates y minutos cosechados hoy. El total histórico se mantendrá.")
+        } message: {
+            Text("Se pondrán a 0 los tomates y minutos cosechados hoy. El total histórico se mantendrá.")
+        }
+        .alert("¿Limpiar todo el histórico?", isPresented: $showConfirmResetTotal) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Borrar todo", role: .destructive) {
+                vm.clearAllStats()
             }
-            .alert("¿Limpiar todo el histórico?", isPresented: $showConfirmResetTotal) {
-                Button("Cancelar", role: .cancel) {}
-                Button("Borrar todo", role: .destructive) {
-                    vm.clearAllStats()
-                }
-            } message: {
-                Text("Se pondrán a 0h 0m tanto las estadísticas de hoy como todo el acumulado histórico.")
-            }
+        } message: {
+            Text("Se pondrán a 0h 0m tanto las estadísticas de hoy como todo el acumulado histórico.")
         }
     }
 }
@@ -154,13 +175,17 @@ struct StatCard: View {
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(Color(red: 0.25, green: 0.18, blue: 0.22))
             Text(label)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(Color.gray)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
         .background(Color.white)
         .cornerRadius(18)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color(red: 0.94, green: 0.88, blue: 0.90), lineWidth: 1)
+        )
         .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
     }
 }

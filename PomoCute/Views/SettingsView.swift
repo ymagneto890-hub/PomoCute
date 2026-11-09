@@ -7,34 +7,37 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Tiempos Pomodoro")) {
+                Section(header: Text("Tiempos de Sesión")) {
                     Stepper(value: $vm.focusMinutes, in: 1...90) {
                         HStack {
                             Text("🍅 Enfoque")
                                 .fontWeight(.semibold)
+                                .lineLimit(1)
                             Spacer()
                             Text("\(vm.focusMinutes) min")
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                         }
                     }
 
                     Stepper(value: $vm.shortBreakMinutes, in: 1...30) {
                         HStack {
-                            Text("🍵 Descanso Corto")
+                            Text("🍵 Corto")
                                 .fontWeight(.semibold)
+                                .lineLimit(1)
                             Spacer()
                             Text("\(vm.shortBreakMinutes) min")
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                         }
                     }
 
                     Stepper(value: $vm.longBreakMinutes, in: 1...60) {
                         HStack {
-                            Text("🌙 Descanso Largo")
+                            Text("🌙 Largo")
                                 .fontWeight(.semibold)
+                                .lineLimit(1)
                             Spacer()
                             Text("\(vm.longBreakMinutes) min")
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
@@ -71,6 +74,7 @@ struct SettingsView: View {
                     }
                 }
             }
+            .preferredColorScheme(.light)
             .navigationTitle("⚙️ Ajustes")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
