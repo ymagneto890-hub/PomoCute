@@ -27,4 +27,10 @@ targets:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG"
         Release:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: "wholemodule"
           DEAD_CODE_STRIPPING: "YES"
+          STRIP_INSTALLED_PRODUCT: "YES"
+          DEPLOYMENT_POSTPROCESSING: "YES"
+          STRIP_STYLE: "all"
+          COPY_PHASE_STRIP: "YES"
+          DEBUG_INFORMATION_FORMAT: "dwarf-with-dsym"

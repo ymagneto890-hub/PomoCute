@@ -219,19 +219,39 @@ final class TimerViewModel: ObservableObject {
         }
         if popSoundID != 0 {
             AudioServicesDisposeSystemSoundID(popSoundID)
+            popSoundID = 0
         }
         if bellSoundID != 0 {
             AudioServicesDisposeSystemSoundID(bellSoundID)
+            bellSoundID = 0
         }
     }
 
     // MARK: - Carga de Sonidos Propios
     private func loadCustomSounds() {
         if let popURL = soundResourceURL(named: "pop") {
-            AudioServicesCreateSystemSoundID(popURL as CFURL, &popSoundID)
+            var tempID: SystemSoundID = 0
+            let status = AudioServicesCreateSystemSoundID(popURL as CFURL, &tempID)
+            if status == noErr {
+                popSoundID = tempID
+            } else {
+                popSoundID = 0
+                #if DEBUG
+                print("[PomoCute] Falló AudioServicesCreateSystemSoundID para pop.caf: OSStatus \(status)")
+                #endif
+            }
         }
         if let bellURL = soundResourceURL(named: "bell") {
-            AudioServicesCreateSystemSoundID(bellURL as CFURL, &bellSoundID)
+            var tempID: SystemSoundID = 0
+            let status = AudioServicesCreateSystemSoundID(bellURL as CFURL, &tempID)
+            if status == noErr {
+                bellSoundID = tempID
+            } else {
+                bellSoundID = 0
+                #if DEBUG
+                print("[PomoCute] Falló AudioServicesCreateSystemSoundID para bell.caf: OSStatus \(status)")
+                #endif
+            }
         }
     }
 
@@ -455,7 +475,11 @@ final class TimerViewModel: ObservableObject {
             content.title = "🌙 Descanso largo terminado"
             content.body = "¡Energía recargada! A por el siguiente ciclo 🍅"
         }
-        content.sound = soundEnabled ? .default : nil
+        if soundEnabled {
+            content.sound = UNNotificationSound(named: UNNotificationSoundName("bell.caf"))
+        } else {
+            content.sound = nil
+        }
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, seconds)), repeats: false)
         let request = UNNotificationRequest(identifier: notificationId, content: content, trigger: trigger)

@@ -12,16 +12,37 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Select Xcode Version
+        run: |
+          if [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app
+          fi
+          echo "Xcode seleccionado:"
+          xcodebuild -version
+
       - name: Verify AppIcon Assets
         run: |
-          if [ ! -f "PomoCute/Assets.xcassets/AppIcon.appiconset/AppIcon.png" ]; then
-            echo "ERROR: AppIcon.png no encontrado en PomoCute/Assets.xcassets/AppIcon.appiconset/"
+          ICON_DIR="PomoCute/Assets.xcassets/AppIcon.appiconset"
+          if [ ! -d "$ICON_DIR" ] || [ ! -f "$ICON_DIR/Contents.json" ]; then
+            echo "ERROR: Catálogo AppIcon.appiconset no válido o Contents.json ausente."
             exit 1
           fi
-          echo "Catálogo AppIcon verificado correctamente."
+          if ! ls "$ICON_DIR"/*.png >/dev/null 2>&1; then
+            echo "ERROR: No se encontraron imágenes PNG en AppIcon.appiconset."
+            exit 1
+          fi
+          echo "Catálogo AppIcon verificado correctamente ($(ls "$ICON_DIR"/*.png | wc -l | tr -d ' ') imágenes PNG encontradas)."
 
-      - name: Install XcodeGen
-        run: which xcodegen || brew install xcodegen
+      - name: Install Pinned XcodeGen (2.42.0)
+        run: |
+          XCODEGEN_VER="2.42.0"
+          curl -Ls "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VER}/xcodegen.zip" -o xcodegen.zip
+          unzip -q xcodegen.zip
+          cd xcodegen && sudo ./install.sh && cd ..
+          rm -rf xcodegen xcodegen.zip
+          xcodegen --version
 
       - name: Generate Xcode Project
         run: xcodegen generate
