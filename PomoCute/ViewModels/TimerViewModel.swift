@@ -342,7 +342,6 @@ final class TimerViewModel: ObservableObject {
         scheduleNativeAlarm(seconds: remainingSeconds)
         startTicking()
         persistTimerState()
-        checkNotificationAuthorization()
     }
 
     func pause() {
