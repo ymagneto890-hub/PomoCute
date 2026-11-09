@@ -123,6 +123,10 @@ jobs:
             exit 1
           fi
 
+          # Keep one bundled copy: notification sounds are at the app bundle root.
+          # The source tree retains the originals under PomoCute/Audio for reproducible builds.
+          rm -rf "Payload/PomoCute.app/Audio"
+
           echo "Archivos .caf en PomoCute.app bundle:"
           ls -lh Payload/PomoCute.app/*.caf
 
