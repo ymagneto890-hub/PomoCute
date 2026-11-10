@@ -104,15 +104,9 @@ struct ContentView: View {
 
             Spacer()
 
-            // MARK: - Indicador Fijo de Ciclos (Sin manzana prematura, solo al completar la sesión)
+            // MARK: - Indicador Fijo de Ciclos (Sin manzana prematura, 100% idéntico en todas las pestañas)
             HStack(spacing: 8) {
-                let completedInRound: Int = {
-                    let mod = vm.completedCycles % vm.cycleTarget
-                    if mod == 0 && vm.completedCycles > 0 && vm.mode == .longBreak {
-                        return vm.cycleTarget
-                    }
-                    return mod
-                }()
+                let completedInRound = vm.completedCycles % vm.cycleTarget
                 ForEach(0..<vm.cycleTarget, id: \.self) { index in
                     ZStack {
                         if index < completedInRound {

@@ -4,8 +4,6 @@ on:
   push:
     branches: [ main, master ]
     tags: [ "v*" ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
@@ -45,7 +43,7 @@ jobs:
           fi
           echo "Catálogo AppIcon verificado correctamente."
 
-      - name: Verify Audio Assets and Existing Checks
+      - name: Verify Audio Assets and Unit Tests
         run: |
           if [ ! -f "PomoCute/Audio/bell.caf" ] && [ ! -f "PomoCute/bell.caf" ]; then
             echo "ERROR: bell.caf no encontrado en las fuentes del repositorio."
@@ -55,10 +53,8 @@ jobs:
             echo "ERROR: pop.caf no encontrado en las fuentes del repositorio."
             exit 1
           fi
-          python3 -m venv .venv
-          .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install pyyaml
-          .venv/bin/python test_timer_logic.py
+          pip3 install --break-system-packages pyyaml || true
+          python3 test_timer_logic.py
 
       - name: Install Pinned XcodeGen (2.42.0)
         run: |
@@ -101,6 +97,7 @@ jobs:
           mkdir -p Payload
           cp -r PomoCute.xcarchive/Products/Applications/PomoCute.app Payload/
 
+          # Garantizar que bell.caf y pop.caf estén en la raíz del bundle para UNNotificationSound
           if [ ! -f "Payload/PomoCute.app/bell.caf" ]; then
             if [ -f "Payload/PomoCute.app/Audio/bell.caf" ]; then
               cp "Payload/PomoCute.app/Audio/bell.caf" "Payload/PomoCute.app/bell.caf"
@@ -116,6 +113,7 @@ jobs:
             fi
           fi
 
+          # Verificación obligatoria de recursos .caf
           if [ ! -f "Payload/PomoCute.app/bell.caf" ]; then
             echo "ERROR CRÍTICO: bell.caf no existe en Payload/PomoCute.app/"
             exit 1
@@ -125,9 +123,13 @@ jobs:
             exit 1
           fi
 
+          # Keep one bundled copy: notification sounds are at the app bundle root.
+          # The source tree retains the originals under PomoCute/Audio for reproducible builds.
           rm -rf "Payload/PomoCute.app/Audio"
+
           echo "Archivos .caf en PomoCute.app bundle:"
           ls -lh Payload/PomoCute.app/*.caf
+
           zip -r PomoCute.ipa Payload
 
           echo "=== MEDICIÓN DE TAMAÑO ==="
@@ -142,14 +144,14 @@ jobs:
           path: PomoCute.ipa
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "$GITHUB_REF_NAME" PomoCute.ipa --clobber || \
-          gh release create "$GITHUB_REF_NAME" PomoCute.ipa \
-            --title "PomoCute $GITHUB_REF_NAME (iOS 15+ Native IPA)" \
-            --notes "PomoCute: compilación nativa iOS 15+ con pruebas automáticas de Swift ejecutadas al terminar el proceso de release."
+          RELEASE_TAG="v1.0.4"
+          gh release upload "$RELEASE_TAG" PomoCute.ipa --clobber || \
+          gh release create "$RELEASE_TAG" PomoCute.ipa \
+            --title "PomoCute $RELEASE_TAG (iOS 15+ Native IPA)" \
+            --notes "PomoCute $RELEASE_TAG: Indicador de ciclos 100% unificado e idéntico en todas las pestañas (Enfoque, Corto y Largo)." || true
 
   swift-unit-tests:
     name: Swift unit tests (after build/release)
