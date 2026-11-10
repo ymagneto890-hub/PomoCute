@@ -27,6 +27,7 @@ jobs:
           elif [ -d "/Applications/Xcode_16.0.app" ]; then
             sudo xcode-select -s /Applications/Xcode_16.0.app
           fi
+          sudo xcodebuild -runFirstLaunch || true
           echo "Xcode seleccionado:"
           xcodebuild -version
 
@@ -76,6 +77,7 @@ jobs:
           xcodebuild -project PomoCute.xcodeproj \
             -scheme PomoCute \
             -configuration Debug \
+            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             build \
             CODE_SIGNING_ALLOWED=NO \
@@ -87,6 +89,7 @@ jobs:
           xcodebuild -project PomoCute.xcodeproj \
             -scheme PomoCute \
             -configuration Release \
+            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -archivePath PomoCute.xcarchive \
             archive \
@@ -169,6 +172,7 @@ jobs:
           elif [ -d "/Applications/Xcode_16.0.app" ]; then
             sudo xcode-select -s /Applications/Xcode_16.0.app
           fi
+          sudo xcodebuild -runFirstLaunch || true
           xcodebuild -version
 
       - name: Install Pinned XcodeGen (2.42.0)
