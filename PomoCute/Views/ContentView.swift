@@ -120,10 +120,15 @@ struct ContentView: View {
                             Text("🍅")
                                 .font(.system(size: 15))
                         } else {
-                            // Espacio reservado exacto (círculo pendiente para mantener idéntico layout 22x22)
+                            // Hueco pendiente estético con relieve y borde pastel del modo
                             Circle()
                                 .fill(Color.white.opacity(0.85))
-                                .frame(width: 10, height: 10)
+                                .frame(width: 12, height: 12)
+                                .overlay(
+                                    Circle()
+                                        .stroke(vm.mode.accentColor.opacity(0.35), lineWidth: 1.5)
+                                )
+                                .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 1)
                         }
                     }
                     .frame(width: 22, height: 22)
