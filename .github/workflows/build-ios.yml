@@ -4,6 +4,8 @@ on:
   push:
     branches: [ main, master ]
     tags: [ "v*" ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
@@ -152,7 +154,7 @@ jobs:
   swift-unit-tests:
     name: Swift unit tests (after build/release)
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') && needs.build.result == 'success'
+    if: (github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')) && needs.build.result == 'success'
     runs-on: macos-latest
     steps:
       - name: Checkout Repository
