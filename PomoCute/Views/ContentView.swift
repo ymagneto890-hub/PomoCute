@@ -235,20 +235,25 @@ struct ContentView: View {
             SettingsView()
                 .environmentObject(vm)
         }
+        .alert("PomoCute", isPresented: $vm.showingCompletionAlert) {
+            Button("Aceptar", role: .cancel) {
+                vm.showingCompletionAlert = false
+            }
+        } message: {
+            Text(vm.completionAlertMessage)
+        }
         .alert("Notificaciones desactivadas", isPresented: $vm.notificationsDenied) {
             Button("Abrir Ajustes") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
+                vm.notificationsDenied = false
             }
-            Button("Ahora no", role: .cancel) {}
+            Button("Ahora no", role: .cancel) {
+                vm.notificationsDenied = false
+            }
         } message: {
             Text("Sin notificaciones no sonará el aviso con la pantalla bloqueada.")
-        }
-        .alert("PomoCute", isPresented: $vm.showingCompletionAlert) {
-            Button("Aceptar", role: .cancel) {}
-        } message: {
-            Text(vm.completionAlertMessage)
         }
         .preferredColorScheme(.light)
     }

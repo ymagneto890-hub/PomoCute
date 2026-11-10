@@ -4,8 +4,7 @@ struct BasketView: View {
     @EnvironmentObject var vm: TimerViewModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var showConfirmResetToday = false
-    @State private var showConfirmResetTotal = false
+    @State private var resetConfirmation: ResetConfirmation?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -124,7 +123,7 @@ struct BasketView: View {
 
                         HStack {
                             Button("Vaciar cesta de hoy") {
-                                showConfirmResetToday = true
+                                resetConfirmation = .today
                             }
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(Color(red: 0.65, green: 0.45, blue: 0.55))
@@ -132,7 +131,7 @@ struct BasketView: View {
                             Spacer()
 
                             Button("Limpiar histórico total") {
-                                showConfirmResetTotal = true
+                                resetConfirmation = .total
                             }
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(Color(red: 0.90, green: 0.25, blue: 0.30))
@@ -146,23 +145,32 @@ struct BasketView: View {
         }
         .background(Color(red: 0.99, green: 0.96, blue: 0.97).ignoresSafeArea())
         .preferredColorScheme(.light)
-        .alert("¿Vaciar cesta de hoy?", isPresented: $showConfirmResetToday) {
-            Button("Cancelar", role: .cancel) {}
-            Button("Vaciar", role: .destructive) {
-                vm.clearTodayStats()
+        .alert(item: $resetConfirmation) { confirmation in
+            switch confirmation {
+            case .today:
+                return Alert(
+                    title: Text("¿Vaciar cesta de hoy?"),
+                    message: Text("Se pondrán a 0 los tomates y minutos cosechados hoy. El total histórico se mantendrá."),
+                    primaryButton: .destructive(Text("Vaciar"), action: vm.clearTodayStats),
+                    secondaryButton: .cancel(Text("Cancelar"))
+                )
+            case .total:
+                return Alert(
+                    title: Text("¿Limpiar todo el histórico?"),
+                    message: Text("Se pondrán a 0h 0m tanto las estadísticas de hoy como todo el acumulado histórico."),
+                    primaryButton: .destructive(Text("Borrar todo"), action: vm.clearAllStats),
+                    secondaryButton: .cancel(Text("Cancelar"))
+                )
             }
-        } message: {
-            Text("Se pondrán a 0 los tomates y minutos cosechados hoy. El total histórico se mantendrá.")
-        }
-        .alert("¿Limpiar todo el histórico?", isPresented: $showConfirmResetTotal) {
-            Button("Cancelar", role: .cancel) {}
-            Button("Borrar todo", role: .destructive) {
-                vm.clearAllStats()
-            }
-        } message: {
-            Text("Se pondrán a 0h 0m tanto las estadísticas de hoy como todo el acumulado histórico.")
         }
     }
+}
+
+private enum ResetConfirmation: String, Identifiable {
+    case today
+    case total
+
+    var id: String { rawValue }
 }
 
 struct StatCard: View {

@@ -77,6 +77,67 @@ final class TimerViewModelTests: XCTestCase {
         XCTAssertLessThanOrEqual(viewModel.remainingSeconds, viewModel.totalSeconds)
     }
 
+    func testPauseAndResumeDoNotRestartTheFullSession() {
+        let viewModel = TimerViewModel()
+        viewModel.remainingSeconds = 120
+        viewModel.start()
+        viewModel.pause()
+        let pausedSeconds = viewModel.remainingSeconds
+
+        XCTAssertFalse(viewModel.isRunning)
+        XCTAssertGreaterThan(pausedSeconds, 0)
+        XCTAssertLessThanOrEqual(pausedSeconds, 120)
+        XCTAssertEqual(defaults.double(forKey: "targetEnd"), 0)
+
+        viewModel.start()
+        XCTAssertTrue(viewModel.isRunning)
+        XCTAssertLessThanOrEqual(viewModel.remainingSeconds, pausedSeconds)
+        viewModel.pause()
+    }
+
+    func testNuevoDiaReiniciaSoloLasEstadisticasDiariasYCiclos() {
+        defaults.set("Enfoque", forKey: "mode")
+        defaults.set(1500, forKey: "totalSeconds")
+        defaults.set(900, forKey: "remainingSeconds")
+        defaults.set("2000-01-01", forKey: "lastDateString")
+        defaults.set(3, forKey: "completedCycles")
+        defaults.set(45, forKey: "todayMinutes")
+        defaults.set(2, forKey: "todayTomatoes")
+        defaults.set(600, forKey: "totalMinutes")
+        defaults.set(25, forKey: "totalTomatoes")
+
+        let viewModel = TimerViewModel()
+
+        XCTAssertEqual(viewModel.todayMinutes, 0)
+        XCTAssertEqual(viewModel.todayTomatoes, 0)
+        XCTAssertEqual(viewModel.completedCycles, 0)
+        XCTAssertEqual(viewModel.totalMinutes, 600)
+        XCTAssertEqual(viewModel.totalTomatoes, 25)
+        XCTAssertEqual(viewModel.remainingSeconds, 900)
+    }
+
+    func testDescansoExpiradoAlRestaurarNoCuentaTomateNiMinutos() {
+        defaults.set("Corto", forKey: "mode")
+        defaults.set(300, forKey: "totalSeconds")
+        defaults.set(1, forKey: "remainingSeconds")
+        defaults.set(2, forKey: "completedCycles")
+        defaults.set(17, forKey: "todayMinutes")
+        defaults.set(3, forKey: "todayTomatoes")
+        defaults.set(100, forKey: "totalMinutes")
+        defaults.set(10, forKey: "totalTomatoes")
+        defaults.set(Date().addingTimeInterval(-2).timeIntervalSince1970, forKey: "targetEnd")
+
+        let viewModel = TimerViewModel()
+
+        XCTAssertEqual(viewModel.mode, .focus)
+        XCTAssertFalse(viewModel.isRunning)
+        XCTAssertEqual(viewModel.completedCycles, 2)
+        XCTAssertEqual(viewModel.todayMinutes, 17)
+        XCTAssertEqual(viewModel.todayTomatoes, 3)
+        XCTAssertEqual(viewModel.totalMinutes, 100)
+        XCTAssertEqual(viewModel.totalTomatoes, 10)
+    }
+
     func testFormattedTimeUsesMinutesAndSeconds() {
         let viewModel = TimerViewModel()
         viewModel.remainingSeconds = 65
