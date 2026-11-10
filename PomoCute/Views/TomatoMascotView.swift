@@ -43,53 +43,52 @@ struct TomatoMascotView: View {
                         .frame(width: 13, height: 13)
                         .offset(x: -16, y: -16)
 
-                    // Carita Kawaii
-                    HStack(spacing: 11) {
-                        // Ojo Izquierdo
-                        VStack {
+                    // Carita Kawaii (Calcada fielmente del icono de la app)
+                    VStack(spacing: 4) {
+                        // Ojos Kawaii
+                        HStack(spacing: 16) {
+                            // Ojo Izquierdo
                             if isBlinking {
                                 Capsule()
                                     .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
                                     .frame(width: 6, height: 2)
                             } else {
-                                Circle()
+                                Capsule()
                                     .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
-                                    .frame(width: 6, height: 6)
+                                    .frame(width: 5.5, height: 7.5)
+                            }
+
+                            // Ojo Derecho
+                            if isBlinking {
+                                Capsule()
+                                    .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
+                                    .frame(width: 6, height: 2)
+                            } else {
+                                Capsule()
+                                    .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
+                                    .frame(width: 5.5, height: 7.5)
                             }
                         }
 
-                        // Boca sonriente
+                        // Boca sonriente (U feliz centrada debajo de los ojos)
                         Circle()
                             .trim(from: 0.05, to: 0.45)
-                            .stroke(Color(red: 0.3, green: 0.15, blue: 0.2), lineWidth: 2.0)
-                            .frame(width: 10, height: 10)
-                            .rotationEffect(.degrees(180))
-                            .offset(y: 2)
-
-                        // Ojo Derecho
-                        VStack {
-                            if isBlinking {
-                                Capsule()
-                                    .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
-                                    .frame(width: 6, height: 2)
-                            } else {
-                                Circle()
-                                    .fill(Color(red: 0.25, green: 0.18, blue: 0.22))
-                                    .frame(width: 6, height: 6)
-                            }
-                        }
+                            .stroke(Color(red: 0.25, green: 0.18, blue: 0.22), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+                            .frame(width: 11, height: 11)
+                            .offset(y: -1)
                     }
+                    .offset(y: 3)
 
                     // Mejillas sonrosadas (Blush)
                     HStack(spacing: 28) {
                         Circle()
                             .fill(Color(red: 1.0, green: 0.70, blue: 0.76).opacity(0.85))
-                            .frame(width: 9, height: 7)
+                            .frame(width: 8, height: 6)
                         Circle()
                             .fill(Color(red: 1.0, green: 0.70, blue: 0.76).opacity(0.85))
-                            .frame(width: 9, height: 7)
+                            .frame(width: 8, height: 6)
                     }
-                    .offset(y: 4)
+                    .offset(y: 7)
                 }
             }
         }
