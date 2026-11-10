@@ -49,3 +49,28 @@ targets:
           STRIP_STYLE: "all"
           COPY_PHASE_STRIP: "YES"
           DEBUG_INFORMATION_FORMAT: "dwarf-with-dsym"
+
+  PomoCuteTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: PomoCuteTests
+    dependencies:
+      - target: PomoCute
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pomocute.native.tests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  PomoCute:
+    build:
+      targets:
+        PomoCute: all
+        PomoCuteTests: [test]
+    test:
+      config: Debug
+      targets:
+        - PomoCuteTests
