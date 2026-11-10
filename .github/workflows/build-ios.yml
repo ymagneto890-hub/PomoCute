@@ -180,13 +180,25 @@ jobs:
       - name: Generate Xcode Project
         run: xcodegen generate
 
+      - name: Select an available iOS Simulator
+        id: simulator
+        run: |
+          SIMULATOR_ID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for group in data["devices"].values() for d in group if d.get("isAvailable") and d.get("name","").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "ERROR: No hay ningún simulador iPhone iOS disponible en este runner."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Usando simulador iOS: $SIMULATOR_ID"
+          echo "udid=$SIMULATOR_ID" >> "$GITHUB_OUTPUT"
+
       - name: Run Swift unit tests on iOS Simulator
         run: |
           xcodebuild test \
             -project PomoCute.xcodeproj \
             -scheme PomoCute \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
             -derivedDataPath DerivedData \
             -resultBundlePath TestResults.xcresult \
             -parallel-testing-enabled NO \
