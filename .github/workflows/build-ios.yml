@@ -4,6 +4,8 @@ on:
   push:
     branches: [ main, master ]
     tags: [ "v*" ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
@@ -43,7 +45,7 @@ jobs:
           fi
           echo "Catálogo AppIcon verificado correctamente."
 
-      - name: Verify Audio Assets and Unit Tests
+      - name: Verify Audio Assets and Existing Checks
         run: |
           if [ ! -f "PomoCute/Audio/bell.caf" ] && [ ! -f "PomoCute/bell.caf" ]; then
             echo "ERROR: bell.caf no encontrado en las fuentes del repositorio."
@@ -53,8 +55,10 @@ jobs:
             echo "ERROR: pop.caf no encontrado en las fuentes del repositorio."
             exit 1
           fi
-          pip3 install --break-system-packages pyyaml || true
-          python3 test_timer_logic.py
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install pyyaml
+          .venv/bin/python test_timer_logic.py
 
       - name: Install Pinned XcodeGen (2.42.0)
         run: |
@@ -97,7 +101,6 @@ jobs:
           mkdir -p Payload
           cp -r PomoCute.xcarchive/Products/Applications/PomoCute.app Payload/
 
-          # Garantizar que bell.caf y pop.caf estén en la raíz del bundle para UNNotificationSound
           if [ ! -f "Payload/PomoCute.app/bell.caf" ]; then
             if [ -f "Payload/PomoCute.app/Audio/bell.caf" ]; then
               cp "Payload/PomoCute.app/Audio/bell.caf" "Payload/PomoCute.app/bell.caf"
@@ -113,7 +116,6 @@ jobs:
             fi
           fi
 
-          # Verificación obligatoria de recursos .caf
           if [ ! -f "Payload/PomoCute.app/bell.caf" ]; then
             echo "ERROR CRÍTICO: bell.caf no existe en Payload/PomoCute.app/"
             exit 1
@@ -123,13 +125,9 @@ jobs:
             exit 1
           fi
 
-          # Keep one bundled copy: notification sounds are at the app bundle root.
-          # The source tree retains the originals under PomoCute/Audio for reproducible builds.
           rm -rf "Payload/PomoCute.app/Audio"
-
           echo "Archivos .caf en PomoCute.app bundle:"
           ls -lh Payload/PomoCute.app/*.caf
-
           zip -r PomoCute.ipa Payload
 
           echo "=== MEDICIÓN DE TAMAÑO ==="
@@ -144,10 +142,74 @@ jobs:
           path: PomoCute.ipa
 
       - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload v1.0.3 PomoCute.ipa --clobber || \
-          gh release create v1.0.3 PomoCute.ipa \
-            --title "PomoCute v1.0.3 (iOS 15+ Native IPA)" \
-            --notes "PomoCute 1.0.3: Huecos de ciclo estéticos con relieve y contorno pastel armónico, sin manzana prematura." || true
+          gh release upload "$GITHUB_REF_NAME" PomoCute.ipa --clobber || \
+          gh release create "$GITHUB_REF_NAME" PomoCute.ipa \
+            --title "PomoCute $GITHUB_REF_NAME (iOS 15+ Native IPA)" \
+            --notes "PomoCute: compilación nativa iOS 15+ con pruebas automáticas de Swift ejecutadas al terminar el proceso de release."
+
+  swift-unit-tests:
+    name: Swift unit tests (after build/release)
+    needs: build
+    if: (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || startsWith(github.ref, 'refs/tags/v')) && needs.build.result == 'success'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          if [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app
+          fi
+          xcodebuild -version
+
+      - name: Install Pinned XcodeGen (2.42.0)
+        run: |
+          XCODEGEN_VER="2.42.0"
+          curl -Ls "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VER}/xcodegen.zip" -o xcodegen.zip
+          unzip -q xcodegen.zip
+          cd xcodegen && sudo ./install.sh && cd ..
+          rm -rf xcodegen xcodegen.zip
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Select an available iOS Simulator
+        id: simulator
+        run: |
+          SIMULATOR_ID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for group in data["devices"].values() for d in group if d.get("isAvailable") and d.get("name","").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "ERROR: No hay ningún simulador iPhone iOS disponible en este runner."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Usando simulador iOS: $SIMULATOR_ID"
+          echo "udid=$SIMULATOR_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Run Swift unit tests on iOS Simulator
+        run: |
+          xcodebuild test \
+            -project PomoCute.xcodeproj \
+            -scheme PomoCute \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            -derivedDataPath DerivedData \
+            -resultBundlePath TestResults.xcresult \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Upload XCTest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PomoCute-XCTest-Results
+          path: TestResults.xcresult
+          if-no-files-found: ignore
