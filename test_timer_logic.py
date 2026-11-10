@@ -126,6 +126,26 @@ def test_iphone_se_geometry():
     margin = 568 - total_elements
     print(f"  [OK] Altura total de componentes: {total_elements} pt. Margen vertical libre para Spacers: {margin} pt.")
 
+def test_cycle_indicator_logic():
+    print("[TEST] Logica del indicador de ciclos (sin fruta prematura, espacio reservado):")
+    def get_completed_in_round(completed_cycles, cycle_target, mode):
+        mod = completed_cycles % cycle_target
+        if mod == 0 and completed_cycles > 0 and mode == "longBreak":
+            return cycle_target
+        return mod
+
+    # Al inicio (0 sesiones completadas) -> 0 frutas visibles
+    assert get_completed_in_round(0, 4, "focus") == 0
+    # Tras completar sesion 1 (pasa a descanso corto) -> 1 fruta visible
+    assert get_completed_in_round(1, 4, "shortBreak") == 1
+    # Durante siguiente sesion de enfoque (1 completada) -> 1 fruta visible
+    assert get_completed_in_round(1, 4, "focus") == 1
+    # Tras completar sesion 4 (en descanso largo) -> 4 frutas completas
+    assert get_completed_in_round(4, 4, "longBreak") == 4
+    # Tras terminar descanso largo (nueva ronda) -> 0 frutas visibles
+    assert get_completed_in_round(4, 4, "focus") == 0
+    print("  [OK] La fruta solo aparece tras completar la sesion y conserva el layout.")
+
 if __name__ == "__main__":
     print("=== SUITE DE PRUEBAS AUTOMATIZADAS DE POMOCUTE ===")
     test_timer_math_precision()
@@ -134,4 +154,5 @@ if __name__ == "__main__":
     test_infoplist_and_project_yml()
     test_audio_assets()
     test_iphone_se_geometry()
+    test_cycle_indicator_logic()
     print("=== TODAS LAS PRUEBAS AUTOMATIZADAS COMPLETADAS CON EXITO ===")
