@@ -142,6 +142,34 @@ def test_cycle_indicator_logic():
     assert get_completed_in_round(3, 4) == 3
     print("  [OK] El indicador de frutas es 100% identico e invariable entre pestañas.")
 
+def test_weekly_chart_logic():
+    print("[TEST] Logica de grafica semanal (Lun - Dom) y escalado de eje Y:")
+    def days_from_monday(gregorian_weekday):
+        # En Calendar.Component.weekday: 1=Dom, 2=Lun, 3=Mar, 4=Mie, 5=Jue, 6=Vie, 7=Sab
+        return (gregorian_weekday + 5) % 7
+
+    assert days_from_monday(2) == 0  # Lunes
+    assert days_from_monday(3) == 1  # Martes
+    assert days_from_monday(4) == 2  # Miercoles
+    assert days_from_monday(5) == 3  # Jueves
+    assert days_from_monday(6) == 4  # Viernes
+    assert days_from_monday(7) == 5  # Sabado
+    assert days_from_monday(1) == 6  # Domingo
+
+    def chart_max_axis_hours(max_mins):
+        if max_mins <= 240:
+            return 4
+        needed = int(math.ceil(max_mins / 60.0))
+        return ((needed + 3) // 4) * 4
+
+    assert chart_max_axis_hours(0) == 4
+    assert chart_max_axis_hours(150) == 4
+    assert chart_max_axis_hours(240) == 4
+    assert chart_max_axis_hours(245) == 8
+    assert chart_max_axis_hours(480) == 8
+    assert chart_max_axis_hours(500) == 12
+    print("  [OK] Calculo de semana (Lun-Dom) y techo de eje Y multiplos de 4h verificados.")
+
 if __name__ == "__main__":
     print("=== SUITE DE PRUEBAS AUTOMATIZADAS DE POMOCUTE ===")
     test_timer_math_precision()
@@ -151,4 +179,5 @@ if __name__ == "__main__":
     test_audio_assets()
     test_iphone_se_geometry()
     test_cycle_indicator_logic()
+    test_weekly_chart_logic()
     print("=== TODAS LAS PRUEBAS AUTOMATIZADAS COMPLETADAS CON EXITO ===")

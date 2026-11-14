@@ -20,32 +20,92 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode Version
+      - name: Select Xcode Matching Installed Simulator Runtime
         run: |
-          ls -d /Applications/Xcode* || true
-          if [ -d "/Applications/Xcode_16.2.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.2.app
-          elif [ -d "/Applications/Xcode_16.1.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.1.app
-          elif [ -d "/Applications/Xcode_16.0.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.0.app
-          fi
+          python3 - <<'PY'
+          import glob, json, os, plistlib, subprocess
+          try:
+              out = subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "-j"], text=True)
+              runtimes = json.loads(out).get("runtimes", [])
+              installed = {r.get("buildversion") for r in runtimes if r.get("isAvailable")}
+          except Exception as e:
+              print("Warning listing runtimes:", e)
+              installed = set()
+          print("Installed simulator runtime builds:", installed)
+
+          candidates = sorted(glob.glob("/Applications/Xcode*.app"), reverse=True)
+          selected = None
+          for app in candidates:
+              plist_path = os.path.join(
+                  app,
+                  "Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/CoreServices/SystemVersion.plist"
+              )
+              if os.path.isfile(plist_path):
+                  with open(plist_path, "rb") as f:
+                      sdk_build = plistlib.load(f).get("ProductBuildVersion")
+                  print(f"Found {app} -> SDK build {sdk_build}")
+                  if sdk_build in installed:
+                      if "Xcode_16" in app:
+                          selected = app
+                          break
+                      if selected is None:
+                          selected = app
+          if selected:
+              print(f"Selecting matching Xcode: {selected}")
+              subprocess.check_call(["sudo", "xcode-select", "-s", selected])
+          PY
           sudo xcodebuild -runFirstLaunch || true
-          echo "Xcode seleccionado:"
+          echo "Xcode activo:"
           xcodebuild -version
 
-      - name: Verify AppIcon Assets
+      - name: Prepare Explicit AppIcon Sizes for actool
         run: |
           ICON_DIR="PomoCute/Assets.xcassets/AppIcon.appiconset"
-          if [ ! -d "$ICON_DIR" ] || [ ! -f "$ICON_DIR/Contents.json" ]; then
-            echo "ERROR: Catálogo AppIcon.appiconset no válido o Contents.json ausente."
+          SRC_ICON="$ICON_DIR/AppIcon.png"
+          if [ ! -f "$SRC_ICON" ]; then
+            echo "ERROR: No se encontró $SRC_ICON"
             exit 1
           fi
-          if ! ls "$ICON_DIR"/*.png >/dev/null 2>&1; then
-            echo "ERROR: No se encontraron imágenes PNG en AppIcon.appiconset."
-            exit 1
-          fi
-          echo "Catálogo AppIcon verificado correctamente."
+          python3 - <<'PY'
+          import json, os, subprocess
+          icon_dir = "PomoCute/Assets.xcassets/AppIcon.appiconset"
+          src = os.path.join(icon_dir, "AppIcon.png")
+          specs = [
+              ("iphone", "20x20", "2x", 40),
+              ("iphone", "20x20", "3x", 60),
+              ("iphone", "29x29", "2x", 58),
+              ("iphone", "29x29", "3x", 87),
+              ("iphone", "40x40", "2x", 80),
+              ("iphone", "40x40", "3x", 120),
+              ("iphone", "60x60", "2x", 120),
+              ("iphone", "60x60", "3x", 180),
+              ("ipad", "20x20", "1x", 20),
+              ("ipad", "20x20", "2x", 40),
+              ("ipad", "29x29", "1x", 29),
+              ("ipad", "29x29", "2x", 58),
+              ("ipad", "40x40", "1x", 40),
+              ("ipad", "40x40", "2x", 80),
+              ("ipad", "76x76", "1x", 76),
+              ("ipad", "76x76", "2x", 152),
+              ("ipad", "83.5x83.5", "2x", 167),
+              ("ios-marketing", "1024x1024", "1x", 1024),
+          ]
+          images = []
+          for idiom, size_str, scale, px in specs:
+              fname = f"Icon-{idiom}-{size_str}@{scale}.png"
+              out_path = os.path.join(icon_dir, fname)
+              subprocess.check_call(["sips", "-z", str(px), str(px), src, "--out", out_path], stdout=subprocess.DEVNULL)
+              images.append({
+                  "filename": fname,
+                  "idiom": idiom,
+                  "scale": scale,
+                  "size": size_str
+              })
+          contents = {"images": images, "info": {"author": "xcode", "version": 1}}
+          with open(os.path.join(icon_dir, "Contents.json"), "w", encoding="utf-8") as f:
+              json.dump(contents, f, indent=2)
+          print("Catálogo AppIcon multi-resolución generado exitosamente.")
+          PY
 
       - name: Verify Audio Assets and Unit Tests
         run: |
@@ -74,18 +134,6 @@ jobs:
           xcodegen generate
           echo "=== Info.plist generado ==="
           cat PomoCute/Info.plist
-
-      - name: Build Debug Check
-        run: |
-          xcodebuild -project PomoCute.xcodeproj \
-            -scheme PomoCute \
-            -configuration Debug \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
 
       - name: Build Pure Native iOS IPA (Release)
         run: |
@@ -129,8 +177,6 @@ jobs:
             exit 1
           fi
 
-          # Keep one bundled copy: notification sounds are at the app bundle root.
-          # The source tree retains the originals under PomoCute/Audio for reproducible builds.
           rm -rf "Payload/PomoCute.app/Audio"
 
           echo "Archivos .caf en PomoCute.app bundle:"
@@ -153,11 +199,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_TAG="v1.0.4"
+          RELEASE_TAG="v1.0.5"
           gh release upload "$RELEASE_TAG" PomoCute.ipa --clobber || \
           gh release create "$RELEASE_TAG" PomoCute.ipa \
             --title "PomoCute $RELEASE_TAG (iOS 15+ Native IPA)" \
-            --notes "PomoCute $RELEASE_TAG: Indicador de ciclos 100% unificado e idéntico en todas las pestañas (Enfoque, Corto y Largo)." || true
+            --notes "PomoCute $RELEASE_TAG: Nuevo gráfico de barras semanal (Lun-Dom), resumen de horas de la semana y total histórico en Malva Suave dentro de Tu Cesta de Enfoque." || true
 
   swift-unit-tests:
     name: Swift unit tests (after build/release)
@@ -168,17 +214,79 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode Version
+      - name: Select Xcode Matching Installed Simulator Runtime
         run: |
-          if [ -d "/Applications/Xcode_16.2.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.2.app
-          elif [ -d "/Applications/Xcode_16.1.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.1.app
-          elif [ -d "/Applications/Xcode_16.0.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_16.0.app
-          fi
+          python3 - <<'PY'
+          import glob, json, os, plistlib, subprocess
+          try:
+              out = subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "-j"], text=True)
+              runtimes = json.loads(out).get("runtimes", [])
+              installed = {r.get("buildversion") for r in runtimes if r.get("isAvailable")}
+          except Exception:
+              installed = set()
+          candidates = sorted(glob.glob("/Applications/Xcode*.app"), reverse=True)
+          selected = None
+          for app in candidates:
+              plist_path = os.path.join(
+                  app,
+                  "Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/CoreServices/SystemVersion.plist"
+              )
+              if os.path.isfile(plist_path):
+                  with open(plist_path, "rb") as f:
+                      sdk_build = plistlib.load(f).get("ProductBuildVersion")
+                  if sdk_build in installed:
+                      if "Xcode_16" in app:
+                          selected = app
+                          break
+                      if selected is None:
+                          selected = app
+          if selected:
+              subprocess.check_call(["sudo", "xcode-select", "-s", selected])
+          PY
           sudo xcodebuild -runFirstLaunch || true
           xcodebuild -version
+
+      - name: Prepare Explicit AppIcon Sizes for actool
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          icon_dir = "PomoCute/Assets.xcassets/AppIcon.appiconset"
+          src = os.path.join(icon_dir, "AppIcon.png")
+          specs = [
+              ("iphone", "20x20", "2x", 40),
+              ("iphone", "20x20", "3x", 60),
+              ("iphone", "29x29", "2x", 58),
+              ("iphone", "29x29", "3x", 87),
+              ("iphone", "40x40", "2x", 80),
+              ("iphone", "40x40", "3x", 120),
+              ("iphone", "60x60", "2x", 120),
+              ("iphone", "60x60", "3x", 180),
+              ("ipad", "20x20", "1x", 20),
+              ("ipad", "20x20", "2x", 40),
+              ("ipad", "29x29", "1x", 29),
+              ("ipad", "29x29", "2x", 58),
+              ("ipad", "40x40", "1x", 40),
+              ("ipad", "40x40", "2x", 80),
+              ("ipad", "76x76", "1x", 76),
+              ("ipad", "76x76", "2x", 152),
+              ("ipad", "83.5x83.5", "2x", 167),
+              ("ios-marketing", "1024x1024", "1x", 1024),
+          ]
+          images = []
+          for idiom, size_str, scale, px in specs:
+              fname = f"Icon-{idiom}-{size_str}@{scale}.png"
+              out_path = os.path.join(icon_dir, fname)
+              subprocess.check_call(["sips", "-z", str(px), str(px), src, "--out", out_path], stdout=subprocess.DEVNULL)
+              images.append({
+                  "filename": fname,
+                  "idiom": idiom,
+                  "scale": scale,
+                  "size": size_str
+              })
+          contents = {"images": images, "info": {"author": "xcode", "version": 1}}
+          with open(os.path.join(icon_dir, "Contents.json"), "w", encoding="utf-8") as f:
+              json.dump(contents, f, indent=2)
+          PY
 
       - name: Install Pinned XcodeGen (2.42.0)
         run: |

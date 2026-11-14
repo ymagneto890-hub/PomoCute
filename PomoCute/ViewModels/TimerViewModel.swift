@@ -36,6 +36,13 @@ enum PomodoroMode: String, CaseIterable, Identifiable {
     }
 }
 
+struct DayBarData: Identifiable, Equatable {
+    let id: String          // "yyyy-MM-dd"
+    let shortLabel: String  // "L", "M", "X", "J", "V", "S", "D"
+    let minutes: Int
+    let isToday: Bool
+}
+
 final class TimerViewModel: ObservableObject {
     // MARK: - Claves Constantes de UserDefaults
     private enum Keys {
@@ -49,6 +56,7 @@ final class TimerViewModel: ObservableObject {
         static let todayTomatoes = "todayTomatoes"
         static let totalMinutes = "totalMinutes"
         static let totalTomatoes = "totalTomatoes"
+        static let dailyMinutesHistory = "dailyMinutesHistory"
         static let lastDateString = "lastDateString"
         static let mode = "mode"
         static let totalSeconds = "totalSeconds"
@@ -74,7 +82,12 @@ final class TimerViewModel: ObservableObject {
     // MARK: - Ajustes de Tiempo (Reactivos y persistidos en UserDefaults)
     @Published var focusMinutes: Int {
         didSet {
-            UserDefaults.standard.set(focusMinutes, forKey: Keys.focusMinutes)
+            let safeValue = min(max(focusMinutes, 1), 90)
+            if safeValue != focusMinutes {
+                focusMinutes = safeValue
+                return
+            }
+            UserDefaults.standard.set(safeValue, forKey: Keys.focusMinutes)
             if !isRunning && mode == .focus {
                 applyModeDuration(for: .focus)
             }
@@ -83,7 +96,12 @@ final class TimerViewModel: ObservableObject {
 
     @Published var shortBreakMinutes: Int {
         didSet {
-            UserDefaults.standard.set(shortBreakMinutes, forKey: Keys.shortBreakMinutes)
+            let safeValue = min(max(shortBreakMinutes, 1), 30)
+            if safeValue != shortBreakMinutes {
+                shortBreakMinutes = safeValue
+                return
+            }
+            UserDefaults.standard.set(safeValue, forKey: Keys.shortBreakMinutes)
             if !isRunning && mode == .shortBreak {
                 applyModeDuration(for: .shortBreak)
             }
@@ -92,7 +110,12 @@ final class TimerViewModel: ObservableObject {
 
     @Published var longBreakMinutes: Int {
         didSet {
-            UserDefaults.standard.set(longBreakMinutes, forKey: Keys.longBreakMinutes)
+            let safeValue = min(max(longBreakMinutes, 1), 60)
+            if safeValue != longBreakMinutes {
+                longBreakMinutes = safeValue
+                return
+            }
+            UserDefaults.standard.set(safeValue, forKey: Keys.longBreakMinutes)
             if !isRunning && mode == .longBreak {
                 applyModeDuration(for: .longBreak)
             }
@@ -113,7 +136,6 @@ final class TimerViewModel: ObservableObject {
     @Published var soundEnabled: Bool {
         didSet {
             UserDefaults.standard.set(soundEnabled, forKey: Keys.soundEnabled)
-            // Si el temporizador está corriendo y cambia el sonido, actualizar la notificación pendiente
             if isRunning, let target = targetEndTime {
                 let remaining = Int(ceil(target.timeIntervalSinceNow))
                 if remaining > 0 {
@@ -128,20 +150,43 @@ final class TimerViewModel: ObservableObject {
     }
 
     // MARK: - Estadísticas y Cesta (Reactivos y persistidos en UserDefaults)
+    private var isRollingOverDay: Bool = false
+
+    @Published var dailyMinutesHistory: [String: Int] {
+        didSet {
+            UserDefaults.standard.set(dailyMinutesHistory, forKey: Keys.dailyMinutesHistory)
+        }
+    }
+
     @Published var todayMinutes: Int {
-        didSet { UserDefaults.standard.set(todayMinutes, forKey: Keys.todayMinutes) }
+        didSet {
+            let safeMinutes = max(0, todayMinutes)
+            if safeMinutes != todayMinutes {
+                todayMinutes = safeMinutes
+                return
+            }
+            UserDefaults.standard.set(safeMinutes, forKey: Keys.todayMinutes)
+            if !isRollingOverDay {
+                let todayKey = Self.dayFormatter.string(from: Date())
+                if safeMinutes > 0 {
+                    dailyMinutesHistory[todayKey] = safeMinutes
+                } else {
+                    dailyMinutesHistory.removeValue(forKey: todayKey)
+                }
+            }
+        }
     }
 
     @Published var todayTomatoes: Int {
-        didSet { UserDefaults.standard.set(todayTomatoes, forKey: Keys.todayTomatoes) }
+        didSet { UserDefaults.standard.set(max(0, todayTomatoes), forKey: Keys.todayTomatoes) }
     }
 
     @Published var totalMinutes: Int {
-        didSet { UserDefaults.standard.set(totalMinutes, forKey: Keys.totalMinutes) }
+        didSet { UserDefaults.standard.set(max(0, totalMinutes), forKey: Keys.totalMinutes) }
     }
 
     @Published var totalTomatoes: Int {
-        didSet { UserDefaults.standard.set(totalTomatoes, forKey: Keys.totalTomatoes) }
+        didSet { UserDefaults.standard.set(max(0, totalTomatoes), forKey: Keys.totalTomatoes) }
     }
 
     private var targetEndTime: Date?
@@ -162,6 +207,21 @@ final class TimerViewModel: ObservableObject {
         return f
     }()
 
+    private static func loadDailyHistory(from defaults: UserDefaults) -> [String: Int] {
+        guard let rawDict = defaults.dictionary(forKey: Keys.dailyMinutesHistory) else {
+            return [:]
+        }
+        var result: [String: Int] = [:]
+        for (key, value) in rawDict {
+            if let intVal = value as? Int, intVal > 0 {
+                result[key] = intVal
+            } else if let numVal = value as? NSNumber, numVal.intValue > 0 {
+                result[key] = numVal.intValue
+            }
+        }
+        return result
+    }
+
     init() {
         let defaults = UserDefaults.standard
         let fM = defaults.integer(forKey: Keys.focusMinutes)
@@ -179,17 +239,18 @@ final class TimerViewModel: ObservableObject {
         self.soundEnabled = defaults.object(forKey: Keys.soundEnabled) == nil ? true : defaults.bool(forKey: Keys.soundEnabled)
         self.hapticEnabled = defaults.object(forKey: Keys.hapticEnabled) == nil ? true : defaults.bool(forKey: Keys.hapticEnabled)
 
-        self.todayMinutes = defaults.integer(forKey: Keys.todayMinutes)
-        self.todayTomatoes = defaults.integer(forKey: Keys.todayTomatoes)
-        self.totalMinutes = defaults.integer(forKey: Keys.totalMinutes)
-        self.totalTomatoes = defaults.integer(forKey: Keys.totalTomatoes)
+        self.dailyMinutesHistory = Self.loadDailyHistory(from: defaults)
+        self.todayMinutes = max(0, defaults.integer(forKey: Keys.todayMinutes))
+        self.todayTomatoes = max(0, defaults.integer(forKey: Keys.todayTomatoes))
+        self.totalMinutes = max(0, defaults.integer(forKey: Keys.totalMinutes))
+        self.totalTomatoes = max(0, defaults.integer(forKey: Keys.totalTomatoes))
 
         if let savedModeStr = defaults.string(forKey: Keys.mode), let savedMode = PomodoroMode(rawValue: savedModeStr) {
             self.mode = savedMode
         } else {
             self.mode = .focus
         }
-        self.completedCycles = defaults.integer(forKey: Keys.completedCycles)
+        self.completedCycles = max(0, defaults.integer(forKey: Keys.completedCycles))
         let savedTotalSeconds = defaults.integer(forKey: Keys.totalSeconds)
         let savedRemainingSeconds = defaults.integer(forKey: Keys.remainingSeconds)
         let maximumDurationSeconds: Int
@@ -199,8 +260,15 @@ final class TimerViewModel: ObservableObject {
         case .longBreak: maximumDurationSeconds = 60 * 60
         }
 
-        self.completedCycles = max(0, self.completedCycles)
         checkAndResetDailyStats()
+
+        // Sincronizar los minutos de hoy con el diccionario diario
+        let todayKey = Self.dayFormatter.string(from: Date())
+        if self.todayMinutes > 0 {
+            self.dailyMinutesHistory[todayKey] = self.todayMinutes
+        } else if let recordedToday = self.dailyMinutesHistory[todayKey], recordedToday > 0 {
+            self.todayMinutes = recordedToday
+        }
 
         if savedTotalSeconds > 0 {
             self.totalSeconds = min(savedTotalSeconds, maximumDurationSeconds)
@@ -356,7 +424,6 @@ final class TimerViewModel: ObservableObject {
         if let target = targetEndTime {
             let diff = Int(ceil(target.timeIntervalSinceNow))
             if diff <= 0 {
-                // Caso límite: el usuario pulsó pausa exactamente cuando el temporizador llegó o superó cero
                 remainingSeconds = 0
                 isRunning = false
                 targetEndTime = nil
@@ -437,7 +504,7 @@ final class TimerViewModel: ObservableObject {
         guard let target = targetEndTime else { return }
         let secs = target.timeIntervalSinceNow
         guard secs > 0 else { tick(); return }
-        let first = target.addingTimeInterval(-(ceil(secs) - 1))   // próximo cambio real de segundo
+        let first = target.addingTimeInterval(-(ceil(secs) - 1))
         let t = Timer(fire: first, interval: 1.0, repeats: true) { [weak self] _ in self?.tick() }
         t.tolerance = 0.1
         RunLoop.main.add(t, forMode: .common)
@@ -526,6 +593,66 @@ final class TimerViewModel: ObservableObject {
         persistTimerState()
     }
 
+    // MARK: - Estadísticas Semanales y Gráfico de Barras (Lunes a Domingo)
+    func currentWeekDays(referenceDate: Date = Date()) -> [DayBarData] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.locale = Locale(identifier: "es_ES")
+        cal.timeZone = TimeZone.current
+        cal.firstWeekday = 2 // Lunes
+
+        let startOfRef = cal.startOfDay(for: referenceDate)
+        let todayKey = Self.dayFormatter.string(from: cal.startOfDay(for: Date()))
+
+        let weekday = cal.component(.weekday, from: startOfRef) // 1 = Dom, 2 = Lun, ..., 7 = Sáb
+        let daysFromMonday = (weekday + 5) % 7
+        guard let monday = cal.date(byAdding: .day, value: -daysFromMonday, to: startOfRef) else {
+            return []
+        }
+
+        let labels = ["L", "M", "X", "J", "V", "S", "D"]
+        return (0..<7).compactMap { offset in
+            guard let dayDate = cal.date(byAdding: .day, value: offset, to: monday) else { return nil }
+            let key = Self.dayFormatter.string(from: dayDate)
+            let isToday = (key == todayKey)
+            let mins = isToday ? todayMinutes : (dailyMinutesHistory[key] ?? 0)
+            return DayBarData(
+                id: key,
+                shortLabel: labels[offset],
+                minutes: max(0, mins),
+                isToday: isToday
+            )
+        }
+    }
+
+    var weekMinutes: Int {
+        currentWeekDays().reduce(0) { $0 + $1.minutes }
+    }
+
+    func chartMaxAxisHours(for days: [DayBarData]) -> Int {
+        let maxMins = days.map(\.minutes).max() ?? 0
+        if maxMins <= 240 {
+            return 4
+        }
+        let neededHours = Int(ceil(Double(maxMins) / 60.0))
+        return ((neededHours + 3) / 4) * 4
+    }
+
+    func formatShortBarValue(_ minutes: Int) -> String {
+        guard minutes > 0 else { return "" }
+        if minutes < 60 {
+            return "\(minutes)m"
+        }
+        if minutes % 60 == 0 {
+            return "\(minutes / 60)h"
+        }
+        let hours = Double(minutes) / 60.0
+        let roundedTenths = (hours * 10).rounded() / 10
+        if roundedTenths.truncatingRemainder(dividingBy: 1) == 0 {
+            return "\(Int(roundedTenths))h"
+        }
+        return String(format: "%.1fh", roundedTenths)
+    }
+
     // MARK: - Limpieza de Histórico
     func clearTodayStats() {
         playPop()
@@ -535,6 +662,7 @@ final class TimerViewModel: ObservableObject {
 
     func clearAllStats() {
         playPop()
+        dailyMinutesHistory = [:]
         todayMinutes = 0
         todayTomatoes = 0
         totalMinutes = 0
@@ -545,9 +673,14 @@ final class TimerViewModel: ObservableObject {
         let todayStr = Self.dayFormatter.string(from: Date())
         let lastDate = UserDefaults.standard.string(forKey: Keys.lastDateString) ?? ""
         if lastDate != todayStr {
-            todayMinutes = 0
+            if !lastDate.isEmpty, todayMinutes > 0, dailyMinutesHistory[lastDate] == nil {
+                dailyMinutesHistory[lastDate] = todayMinutes
+            }
+            isRollingOverDay = true
+            todayMinutes = dailyMinutesHistory[todayStr] ?? 0
             todayTomatoes = 0
             completedCycles = 0
+            isRollingOverDay = false
             UserDefaults.standard.set(0, forKey: Keys.completedCycles)
             UserDefaults.standard.set(todayStr, forKey: Keys.lastDateString)
         }

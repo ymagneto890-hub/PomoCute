@@ -6,7 +6,7 @@ final class TimerViewModelTests: XCTestCase {
     private let keys = [
         "focusMinutes", "shortBreakMinutes", "longBreakMinutes", "cycleTarget",
         "soundEnabled", "hapticEnabled", "todayMinutes", "todayTomatoes",
-        "totalMinutes", "totalTomatoes", "lastDateString", "mode",
+        "totalMinutes", "totalTomatoes", "dailyMinutesHistory", "lastDateString", "mode",
         "totalSeconds", "remainingSeconds", "completedCycles", "targetEnd"
     ]
 
@@ -95,7 +95,7 @@ final class TimerViewModelTests: XCTestCase {
         viewModel.pause()
     }
 
-    func testNuevoDiaReiniciaSoloLasEstadisticasDiariasYCiclos() {
+    func testNuevoDiaReiniciaSoloLasEstadisticasDiariasYCiclosConservandoHistorial() {
         defaults.set("Enfoque", forKey: "mode")
         defaults.set(1500, forKey: "totalSeconds")
         defaults.set(900, forKey: "remainingSeconds")
@@ -113,6 +113,7 @@ final class TimerViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.completedCycles, 0)
         XCTAssertEqual(viewModel.totalMinutes, 600)
         XCTAssertEqual(viewModel.totalTomatoes, 25)
+        XCTAssertEqual(viewModel.dailyMinutesHistory["2000-01-01"], 45)
         XCTAssertEqual(viewModel.remainingSeconds, 900)
     }
 
@@ -178,5 +179,31 @@ final class TimerViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.todayTomatoes, 1)
         XCTAssertEqual(viewModel.totalMinutes, 1)
         XCTAssertEqual(viewModel.totalTomatoes, 1)
+    }
+
+    func testCurrentWeekDaysReturnsSevenDaysFromMondayToSunday() {
+        let viewModel = TimerViewModel()
+        viewModel.todayMinutes = 90
+
+        let days = viewModel.currentWeekDays()
+        XCTAssertEqual(days.count, 7)
+        XCTAssertEqual(days.map(\.shortLabel), ["L", "M", "X", "J", "V", "S", "D"])
+        XCTAssertEqual(days.filter(\.isToday).count, 1)
+        XCTAssertEqual(days.first(where: \.isToday)?.minutes, 90)
+        XCTAssertGreaterThanOrEqual(viewModel.weekMinutes, 90)
+    }
+
+    func testBarFormattingAndAxisScaling() {
+        let viewModel = TimerViewModel()
+        XCTAssertEqual(viewModel.formatShortBarValue(0), "")
+        XCTAssertEqual(viewModel.formatShortBarValue(45), "45m")
+        XCTAssertEqual(viewModel.formatShortBarValue(120), "2h")
+        XCTAssertEqual(viewModel.formatShortBarValue(150), "2.5h")
+
+        let sampleLow = [DayBarData(id: "2026-11-09", shortLabel: "L", minutes: 120, isToday: true)]
+        XCTAssertEqual(viewModel.chartMaxAxisHours(for: sampleLow), 4)
+
+        let sampleHigh = [DayBarData(id: "2026-11-09", shortLabel: "L", minutes: 300, isToday: true)]
+        XCTAssertEqual(viewModel.chartMaxAxisHours(for: sampleHigh), 8)
     }
 }

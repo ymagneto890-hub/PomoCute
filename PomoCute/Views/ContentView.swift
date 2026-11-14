@@ -43,6 +43,19 @@ struct ContentView: View {
             .padding(.horizontal, 20)
             .padding(.top, 10)
             .padding(.bottom, 8)
+            .alert("Notificaciones desactivadas", isPresented: $vm.notificationsDenied) {
+                Button("Abrir Ajustes") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                    vm.notificationsDenied = false
+                }
+                Button("Ahora no", role: .cancel) {
+                    vm.notificationsDenied = false
+                }
+            } message: {
+                Text("Sin notificaciones no sonará el aviso con la pantalla bloqueada.")
+            }
 
             // MARK: - Selector de Modos Píldora Kawaii
             HStack(spacing: 4) {
@@ -74,7 +87,7 @@ struct ContentView: View {
 
             Spacer()
 
-            // MARK: - Círculo Principal con Tomatito y Reloj (Sin botones -/+, solo en ajustes)
+            // MARK: - Círculo Principal con Tomatito y Reloj
             ZStack {
                 // Pista de fondo
                 Circle()
@@ -104,17 +117,15 @@ struct ContentView: View {
 
             Spacer()
 
-            // MARK: - Indicador Fijo de Ciclos (Sin manzana prematura, 100% idéntico en todas las pestañas)
+            // MARK: - Indicador Fijo de Ciclos (100% idéntico en todas las pestañas)
             HStack(spacing: 8) {
                 let completedInRound = vm.completedCycles % vm.cycleTarget
                 ForEach(0..<vm.cycleTarget, id: \.self) { index in
                     ZStack {
                         if index < completedInRound {
-                            // Fruta completada (aparece tras completar los minutos de enfoque)
                             Text("🍅")
                                 .font(.system(size: 15))
                         } else {
-                            // Hueco pendiente estético con relieve y borde pastel del modo
                             Circle()
                                 .fill(Color.white.opacity(0.85))
                                 .frame(width: 12, height: 12)
@@ -173,35 +184,33 @@ struct ContentView: View {
 
             Spacer()
 
-            // MARK: - Tarjeta Inferior de Cesta e Histórico (Totalmente visible y espaciosa)
+            // MARK: - Tarjeta Inferior de Cesta e Histórico
             Button(action: {
                 vm.playPop()
                 showBasket = true
             }) {
                 HStack(spacing: 10) {
-                    // Icono Cesta Destacado
                     Text("🧺")
                         .font(.system(size: 20))
                         .frame(width: 36, height: 36)
                         .background(Color(red: 1.0, green: 0.92, blue: 0.95))
                         .clipShape(Circle())
 
-                    // Información de Hoy y Total
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 5) {
-                            Text("Hoy: \(vm.todayTomatoes) 🍅")
+                            Text("Semana: \(vm.formatMinutesHours(vm.weekMinutes))")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
                                 .foregroundColor(Color(red: 1.0, green: 0.38, blue: 0.50))
                             Text("•")
                                 .foregroundColor(Color.gray.opacity(0.4))
-                            Text(vm.formatMinutesHours(vm.todayMinutes))
+                            Text("Hoy: \(vm.formatMinutesHours(vm.todayMinutes))")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                                 .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.30))
                         }
 
-                        Text("Total: \(vm.formatMinutesHours(vm.totalMinutes)) • Ver cesta")
+                        Text("Total: \(vm.formatMinutesHours(vm.totalMinutes)) • Ver gráfica")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundColor(Color(red: 0.55, green: 0.45, blue: 0.50))
+                            .foregroundColor(Color(red: 0.61, green: 0.49, blue: 0.54))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                     }
@@ -241,19 +250,6 @@ struct ContentView: View {
             }
         } message: {
             Text(vm.completionAlertMessage)
-        }
-        .alert("Notificaciones desactivadas", isPresented: $vm.notificationsDenied) {
-            Button("Abrir Ajustes") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
-                vm.notificationsDenied = false
-            }
-            Button("Ahora no", role: .cancel) {
-                vm.notificationsDenied = false
-            }
-        } message: {
-            Text("Sin notificaciones no sonará el aviso con la pantalla bloqueada.")
         }
         .preferredColorScheme(.light)
     }
