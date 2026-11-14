@@ -5,11 +5,14 @@ struct BasketView: View {
     @EnvironmentObject var vm: TimerViewModel
     @Environment(\.dismiss) private var dismiss
 
+    @State private var chartScope: BasketChartScope = .days
     @State private var resetConfirmation: ResetConfirmation?
 
     var body: some View {
-        let weekDays = vm.currentWeekDays()
-        let maxAxisHours = vm.chartMaxAxisHours(for: weekDays)
+        let chartItems = (chartScope == .days) ? vm.currentWeekDays() : vm.recentWeeksBars()
+        let maxAxisHours = vm.chartMaxAxisHours(for: chartItems, minimumHours: chartScope == .days ? 4 : 16)
+        let headerTitle = (chartScope == .days) ? "🗓️ Esta semana" : "📆 Últimas 5 semanas"
+        let headerMinutes = (chartScope == .days) ? vm.weekMinutes : vm.recentWeeksMinutes
 
         VStack(spacing: 0) {
             // MARK: - Barra Superior Personalizada
@@ -40,17 +43,53 @@ struct BasketView: View {
             .background(Color(red: 0.99, green: 0.96, blue: 0.97))
 
             ScrollView {
-                VStack(spacing: 18) {
-                    // MARK: - Tarjeta Protagonista: Cabecera Dual + Gráfico de Barras Semanal
+                VStack(spacing: 14) {
+                    // MARK: - Switch Kawaii: Por días / Por semanas
+                    HStack(spacing: 4) {
+                        ForEach(BasketChartScope.allCases) { scope in
+                            let isSelected = (chartScope == scope)
+                            Button(action: {
+                                guard chartScope != scope else { return }
+                                vm.playPop()
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    chartScope = scope
+                                }
+                            }) {
+                                HStack(spacing: 5) {
+                                    Text(scope.emoji)
+                                        .font(.system(size: 12))
+                                    Text(scope.rawValue)
+                                        .font(.system(size: 12, weight: isSelected ? .heavy : .bold, design: .rounded))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 7)
+                                .background(isSelected ? Color.white : Color.clear)
+                                .foregroundColor(
+                                    isSelected
+                                        ? Color(red: 1.0, green: 0.30, blue: 0.45)
+                                        : Color(red: 0.48, green: 0.36, blue: 0.41)
+                                )
+                                .cornerRadius(13)
+                                .shadow(color: isSelected ? Color.black.opacity(0.05) : Color.clear, radius: 3, x: 0, y: 1)
+                            }
+                        }
+                    }
+                    .padding(4)
+                    .background(Color(red: 0.95, green: 0.89, blue: 0.91))
+                    .cornerRadius(16)
+
+                    // MARK: - Tarjeta Protagonista: Cabecera Dual + Gráfico de Barras
                     VStack(spacing: 0) {
-                        // Cabecera Dual (Esta semana + Total histórico en Malva Suave)
+                        // Cabecera Dual (Resumen del periodo + Total histórico en Malva Suave)
                         HStack(alignment: .center) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("🗓️ Esta semana")
+                                Text(headerTitle)
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(Color(red: 0.62, green: 0.54, blue: 0.58))
 
-                                Text(vm.formatMinutesHours(vm.weekMinutes))
+                                Text(vm.formatMinutesHours(headerMinutes))
                                     .font(.system(size: 26, weight: .black, design: .rounded))
                                     .foregroundColor(Color(red: 1.0, green: 0.30, blue: 0.45))
                                     .lineLimit(1)
@@ -85,9 +124,9 @@ struct BasketView: View {
                             .frame(height: 1)
                             .padding(.bottom, 12)
 
-                        // Gráfico de Barras Clásico y Cute (Lunes a Domingo)
+                        // Gráfico de Barras Clásico y Cute
                         WeeklyBarChartView(
-                            days: weekDays,
+                            days: chartItems,
                             maxAxisHours: maxAxisHours,
                             valueFormatter: vm.formatShortBarValue
                         )
@@ -180,19 +219,21 @@ struct WeeklyBarChartView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            // Eje Y (Horas: 4h, 3h, 2h, 1h, 0h)
+            // Eje Y (Horas)
             VStack(alignment: .trailing, spacing: 0) {
                 ForEach(Array(axisTicks.enumerated()), id: \.offset) { idx, hour in
                     Text("\(hour)h")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(Color(red: 0.69, green: 0.58, blue: 0.63))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         .frame(height: 12)
                     if idx < axisTicks.count - 1 {
                         Spacer(minLength: 0)
                     }
                 }
             }
-            .frame(width: 26, height: plotHeight + 12)
+            .frame(width: 28, height: plotHeight + 12)
             .padding(.top, topHeadroom - 6)
 
             // Área de trazado (Cuadrícula + Barras + Eje X)
@@ -218,6 +259,7 @@ struct WeeklyBarChartView: View {
 
                 // 2. Columnas de barras naciendo desde la línea base 0h
                 VStack(spacing: 0) {
+                    let maxBarWidth: CGFloat = days.count <= 5 ? 30 : 26
                     HStack(alignment: .bottom, spacing: 8) {
                         ForEach(days) { day in
                             VStack(spacing: 3) {
@@ -243,12 +285,12 @@ struct WeeklyBarChartView: View {
                                                 ? Color(red: 1.0, green: 0.40, blue: 0.52) // #FF6685
                                                 : Color(red: 1.0, green: 0.64, blue: 0.72) // #FFA3B8
                                         )
-                                        .frame(maxWidth: 26)
+                                        .frame(maxWidth: maxBarWidth)
                                         .frame(height: barHeight)
                                 } else {
                                     TopRoundedBarShape(radius: 1)
                                         .fill(Color(red: 0.91, green: 0.77, blue: 0.82))
-                                        .frame(maxWidth: 26)
+                                        .frame(maxWidth: maxBarWidth)
                                         .frame(height: 2)
                                 }
                             }
@@ -258,11 +300,11 @@ struct WeeklyBarChartView: View {
                     .frame(height: topHeadroom + plotHeight)
                     .padding(.horizontal, 2)
 
-                    // 3. Etiquetas del Eje X (L, M, X, J, V, S, D)
+                    // 3. Etiquetas del Eje X (Días o Semanas)
                     HStack(spacing: 8) {
                         ForEach(days) { day in
                             Text(day.shortLabel)
-                                .font(.system(size: 12, weight: day.isToday ? .heavy : .bold, design: .rounded))
+                                .font(.system(size: days.count <= 5 ? 11 : 12, weight: day.isToday ? .heavy : .bold, design: .rounded))
                                 .foregroundColor(
                                     day.isToday
                                         ? Color(red: 1.0, green: 0.30, blue: 0.45)
@@ -270,6 +312,8 @@ struct WeeklyBarChartView: View {
                                             ? Color(red: 0.48, green: 0.36, blue: 0.41)
                                             : Color(red: 0.69, green: 0.58, blue: 0.63))
                                 )
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
                                 .frame(maxWidth: .infinity)
                         }
                     }

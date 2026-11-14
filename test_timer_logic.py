@@ -156,9 +156,10 @@ def test_weekly_chart_logic():
     assert days_from_monday(7) == 5  # Sabado
     assert days_from_monday(1) == 6  # Domingo
 
-    def chart_max_axis_hours(max_mins):
-        if max_mins <= 240:
-            return 4
+    def chart_max_axis_hours(max_mins, minimum_hours=4):
+        min_h = max(4, ((minimum_hours + 3) // 4) * 4)
+        if max_mins <= min_h * 60:
+            return min_h
         needed = int(math.ceil(max_mins / 60.0))
         return ((needed + 3) // 4) * 4
 
@@ -168,7 +169,10 @@ def test_weekly_chart_logic():
     assert chart_max_axis_hours(245) == 8
     assert chart_max_axis_hours(480) == 8
     assert chart_max_axis_hours(500) == 12
-    print("  [OK] Calculo de semana (Lun-Dom) y techo de eje Y multiplos de 4h verificados.")
+    assert chart_max_axis_hours(0, minimum_hours=16) == 16
+    assert chart_max_axis_hours(855, minimum_hours=16) == 16
+    assert chart_max_axis_hours(1000, minimum_hours=16) == 20
+    print("  [OK] Calculo de semana (Lun-Dom) y techo de eje Y multiplos de 4h (y 16h semanal) verificados.")
 
 if __name__ == "__main__":
     print("=== SUITE DE PRUEBAS AUTOMATIZADAS DE POMOCUTE ===")

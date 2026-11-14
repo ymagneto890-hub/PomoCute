@@ -36,9 +36,23 @@ enum PomodoroMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum BasketChartScope: String, CaseIterable, Identifiable {
+    case days = "Por días"
+    case weeks = "Por semanas"
+
+    var id: String { rawValue }
+
+    var emoji: String {
+        switch self {
+        case .days: return "📅"
+        case .weeks: return "🗓️"
+        }
+    }
+}
+
 struct DayBarData: Identifiable, Equatable {
     let id: String          // "yyyy-MM-dd"
-    let shortLabel: String  // "L", "M", "X", "J", "V", "S", "D"
+    let shortLabel: String  // "L"..."D" o "12 Oct"..."Actual"
     let minutes: Int
     let isToday: Bool
 }
@@ -53,9 +67,7 @@ final class TimerViewModel: ObservableObject {
         static let soundEnabled = "soundEnabled"
         static let hapticEnabled = "hapticEnabled"
         static let todayMinutes = "todayMinutes"
-        static let todayTomatoes = "todayTomatoes"
         static let totalMinutes = "totalMinutes"
-        static let totalTomatoes = "totalTomatoes"
         static let dailyMinutesHistory = "dailyMinutesHistory"
         static let lastDateString = "lastDateString"
         static let mode = "mode"
@@ -177,16 +189,8 @@ final class TimerViewModel: ObservableObject {
         }
     }
 
-    @Published var todayTomatoes: Int {
-        didSet { UserDefaults.standard.set(max(0, todayTomatoes), forKey: Keys.todayTomatoes) }
-    }
-
     @Published var totalMinutes: Int {
         didSet { UserDefaults.standard.set(max(0, totalMinutes), forKey: Keys.totalMinutes) }
-    }
-
-    @Published var totalTomatoes: Int {
-        didSet { UserDefaults.standard.set(max(0, totalTomatoes), forKey: Keys.totalTomatoes) }
     }
 
     private var targetEndTime: Date?
@@ -199,6 +203,8 @@ final class TimerViewModel: ObservableObject {
 
     // Observador de cambio de día a medianoche
     private var dayChangeObserver: NSObjectProtocol?
+
+    private static let shortMonthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -241,9 +247,7 @@ final class TimerViewModel: ObservableObject {
 
         self.dailyMinutesHistory = Self.loadDailyHistory(from: defaults)
         self.todayMinutes = max(0, defaults.integer(forKey: Keys.todayMinutes))
-        self.todayTomatoes = max(0, defaults.integer(forKey: Keys.todayTomatoes))
         self.totalMinutes = max(0, defaults.integer(forKey: Keys.totalMinutes))
-        self.totalTomatoes = max(0, defaults.integer(forKey: Keys.totalTomatoes))
 
         if let savedModeStr = defaults.string(forKey: Keys.mode), let savedMode = PomodoroMode(rawValue: savedModeStr) {
             self.mode = savedMode
@@ -269,6 +273,10 @@ final class TimerViewModel: ObservableObject {
         } else if let recordedToday = self.dailyMinutesHistory[todayKey], recordedToday > 0 {
             self.todayMinutes = recordedToday
         }
+        let historySum = self.dailyMinutesHistory.values.reduce(0, +)
+        if self.totalMinutes < historySum {
+            self.totalMinutes = historySum
+        }
 
         if savedTotalSeconds > 0 {
             self.totalSeconds = min(savedTotalSeconds, maximumDurationSeconds)
@@ -293,7 +301,7 @@ final class TimerViewModel: ObservableObject {
                 self.targetEndTime = nil
                 self.isRunning = false
                 self.remainingSeconds = 0
-                finishCycle(credited: true, alert: false)
+                finishCycle(credited: true, alert: false, completionDate: targetDate)
             } else {
                 self.targetEndTime = nil
                 self.isRunning = false
@@ -511,7 +519,7 @@ final class TimerViewModel: ObservableObject {
         timerSubscription = t
     }
 
-    private func tick(alertOnFinish: Bool = true) {
+    private func tick() {
         guard isRunning, let target = targetEndTime else { return }
         let diff = Int(ceil(target.timeIntervalSinceNow))
         if diff <= 0 {
@@ -521,7 +529,7 @@ final class TimerViewModel: ObservableObject {
             timerSubscription?.invalidate()
             timerSubscription = nil
             cancelNativeAlarm()
-            finishCycle(credited: true, alert: alertOnFinish)
+            finishCycle(credited: true, alert: true)
         } else if diff != remainingSeconds {
             remainingSeconds = diff
         }
@@ -550,7 +558,7 @@ final class TimerViewModel: ObservableObject {
                 timerSubscription?.invalidate()
                 timerSubscription = nil
                 cancelNativeAlarm()
-                finishCycle(credited: true, alert: false)
+                finishCycle(credited: true, alert: false, completionDate: target)
             } else {
                 remainingSeconds = diff
                 startTicking()
@@ -558,7 +566,7 @@ final class TimerViewModel: ObservableObject {
         }
     }
 
-    private func finishCycle(credited: Bool, alert: Bool) {
+    private func finishCycle(credited: Bool, alert: Bool, completionDate: Date? = nil) {
         if alert {
             playChime()
             triggerHaptic()
@@ -573,11 +581,19 @@ final class TimerViewModel: ObservableObject {
         if mode == .focus {
             if credited {
                 let minutesToAdd = totalSeconds / 60
-                todayMinutes += minutesToAdd
-                todayTomatoes += 1
+                let creditKey = Self.dayFormatter.string(from: completionDate ?? Date())
+                let todayKey = Self.dayFormatter.string(from: Date())
+                if creditKey == todayKey {
+                    todayMinutes += minutesToAdd
+                    completedCycles += 1
+                } else {
+                    dailyMinutesHistory[creditKey, default: 0] += minutesToAdd
+                }
                 totalMinutes += minutesToAdd
-                totalTomatoes += 1
-                completedCycles += 1
+                let historySum = dailyMinutesHistory.values.reduce(0, +)
+                if totalMinutes < historySum {
+                    totalMinutes = historySum
+                }
 
                 if completedCycles % cycleTarget == 0 {
                     switchMode(.longBreak)
@@ -593,19 +609,26 @@ final class TimerViewModel: ObservableObject {
         persistTimerState()
     }
 
-    // MARK: - Estadísticas Semanales y Gráfico de Barras (Lunes a Domingo)
-    func currentWeekDays(referenceDate: Date = Date()) -> [DayBarData] {
+    // MARK: - Estadísticas Semanales y Gráfico de Barras (Por días / Por semanas)
+    private static func mondayCalendar() -> Calendar {
         var cal = Calendar(identifier: .gregorian)
         cal.locale = Locale(identifier: "es_ES")
         cal.timeZone = TimeZone.current
         cal.firstWeekday = 2 // Lunes
+        return cal
+    }
 
-        let startOfRef = cal.startOfDay(for: referenceDate)
-        let todayKey = Self.dayFormatter.string(from: cal.startOfDay(for: Date()))
-
-        let weekday = cal.component(.weekday, from: startOfRef) // 1 = Dom, 2 = Lun, ..., 7 = Sáb
+    private static func startOfWeekMonday(for date: Date, calendar: Calendar) -> Date? {
+        let startOfRef = calendar.startOfDay(for: date)
+        let weekday = calendar.component(.weekday, from: startOfRef) // 1 = Dom, 2 = Lun, ..., 7 = Sáb
         let daysFromMonday = (weekday + 5) % 7
-        guard let monday = cal.date(byAdding: .day, value: -daysFromMonday, to: startOfRef) else {
+        return calendar.date(byAdding: .day, value: -daysFromMonday, to: startOfRef)
+    }
+
+    func currentWeekDays(referenceDate: Date = Date()) -> [DayBarData] {
+        let cal = Self.mondayCalendar()
+        let todayKey = Self.dayFormatter.string(from: cal.startOfDay(for: Date()))
+        guard let monday = Self.startOfWeekMonday(for: referenceDate, calendar: cal) else {
             return []
         }
 
@@ -628,10 +651,55 @@ final class TimerViewModel: ObservableObject {
         currentWeekDays().reduce(0) { $0 + $1.minutes }
     }
 
-    func chartMaxAxisHours(for days: [DayBarData]) -> Int {
+    func recentWeeksBars(count: Int = 5, referenceDate: Date = Date()) -> [DayBarData] {
+        let cal = Self.mondayCalendar()
+        let todayKey = Self.dayFormatter.string(from: cal.startOfDay(for: Date()))
+        guard let currentMonday = Self.startOfWeekMonday(for: referenceDate, calendar: cal) else {
+            return []
+        }
+
+        let safeCount = max(1, count)
+        return (-(safeCount - 1)...0).compactMap { weekOffset in
+            guard let weekMonday = cal.date(byAdding: .day, value: weekOffset * 7, to: currentMonday) else {
+                return nil
+            }
+            let weekKey = Self.dayFormatter.string(from: weekMonday)
+            let weekMins = (0..<7).reduce(0) { sum, dayOffset in
+                guard let dayDate = cal.date(byAdding: .day, value: dayOffset, to: weekMonday) else {
+                    return sum
+                }
+                let dayKey = Self.dayFormatter.string(from: dayDate)
+                let dayMins = (dayKey == todayKey) ? todayMinutes : (dailyMinutesHistory[dayKey] ?? 0)
+                return sum + max(0, dayMins)
+            }
+            let isCurrentWeek = (weekOffset == 0)
+            let label: String
+            if isCurrentWeek {
+                label = "Actual"
+            } else {
+                let dayNum = cal.component(.day, from: weekMonday)
+                let monthIdx = cal.component(.month, from: weekMonday) - 1
+                let monthName = (0..<Self.shortMonthNames.count).contains(monthIdx) ? Self.shortMonthNames[monthIdx] : ""
+                label = "\(dayNum) \(monthName)"
+            }
+            return DayBarData(
+                id: weekKey,
+                shortLabel: label,
+                minutes: weekMins,
+                isToday: isCurrentWeek
+            )
+        }
+    }
+
+    var recentWeeksMinutes: Int {
+        recentWeeksBars().reduce(0) { $0 + $1.minutes }
+    }
+
+    func chartMaxAxisHours(for days: [DayBarData], minimumHours: Int = 4) -> Int {
+        let minH = max(4, ((minimumHours + 3) / 4) * 4)
         let maxMins = days.map(\.minutes).max() ?? 0
-        if maxMins <= 240 {
-            return 4
+        if maxMins <= minH * 60 {
+            return minH
         }
         let neededHours = Int(ceil(Double(maxMins) / 60.0))
         return ((neededHours + 3) / 4) * 4
@@ -657,16 +725,13 @@ final class TimerViewModel: ObservableObject {
     func clearTodayStats() {
         playPop()
         todayMinutes = 0
-        todayTomatoes = 0
     }
 
     func clearAllStats() {
         playPop()
         dailyMinutesHistory = [:]
         todayMinutes = 0
-        todayTomatoes = 0
         totalMinutes = 0
-        totalTomatoes = 0
     }
 
     private func checkAndResetDailyStats() {
@@ -678,7 +743,6 @@ final class TimerViewModel: ObservableObject {
             }
             isRollingOverDay = true
             todayMinutes = dailyMinutesHistory[todayStr] ?? 0
-            todayTomatoes = 0
             completedCycles = 0
             isRollingOverDay = false
             UserDefaults.standard.set(0, forKey: Keys.completedCycles)

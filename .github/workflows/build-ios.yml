@@ -199,11 +199,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_TAG="v1.0.5"
+          RELEASE_TAG="v1.0.6"
           gh release upload "$RELEASE_TAG" PomoCute.ipa --clobber || \
           gh release create "$RELEASE_TAG" PomoCute.ipa \
             --title "PomoCute $RELEASE_TAG (iOS 15+ Native IPA)" \
-            --notes "PomoCute $RELEASE_TAG: Nuevo gráfico de barras semanal (Lun-Dom), resumen de horas de la semana y total histórico en Malva Suave dentro de Tu Cesta de Enfoque." || true
+            --notes "PomoCute $RELEASE_TAG: Switch Por días / Por semanas en Tu Cesta de Enfoque, corrección de acreditación histórica y limpieza de código." || true
 
   swift-unit-tests:
     name: Swift unit tests (after build/release)
