@@ -42,130 +42,136 @@ struct BasketView: View {
             .padding(.bottom, 12)
             .background(Color(red: 0.99, green: 0.96, blue: 0.97))
 
-            ScrollView {
-                VStack(spacing: 14) {
-                    // MARK: - Switch Kawaii: Por días / Por semanas
-                    HStack(spacing: 4) {
-                        ForEach(BasketChartScope.allCases) { scope in
-                            let isSelected = (chartScope == scope)
-                            Button(action: {
-                                guard chartScope != scope else { return }
-                                vm.playPop()
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    chartScope = scope
+            GeometryReader { geo in
+                ScrollView {
+                    VStack(spacing: 14) {
+                        VStack(spacing: 14) {
+                            // MARK: - Switch Kawaii: Por días / Por semanas
+                            HStack(spacing: 4) {
+                                ForEach(BasketChartScope.allCases) { scope in
+                                    let isSelected = (chartScope == scope)
+                                    Button(action: {
+                                        guard chartScope != scope else { return }
+                                        vm.playPop()
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            chartScope = scope
+                                        }
+                                    }) {
+                                        HStack(spacing: 5) {
+                                            Text(scope.emoji)
+                                                .font(.system(size: 12))
+                                            Text(scope.rawValue)
+                                                .font(.system(size: 12, weight: isSelected ? .heavy : .bold, design: .rounded))
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.85)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 7)
+                                        .background(isSelected ? Color.white : Color.clear)
+                                        .foregroundColor(
+                                            isSelected
+                                                ? Color(red: 1.0, green: 0.30, blue: 0.45)
+                                                : Color(red: 0.48, green: 0.36, blue: 0.41)
+                                        )
+                                        .cornerRadius(13)
+                                        .shadow(color: isSelected ? Color.black.opacity(0.05) : Color.clear, radius: 3, x: 0, y: 1)
+                                    }
                                 }
-                            }) {
-                                HStack(spacing: 5) {
-                                    Text(scope.emoji)
-                                        .font(.system(size: 12))
-                                    Text(scope.rawValue)
-                                        .font(.system(size: 12, weight: isSelected ? .heavy : .bold, design: .rounded))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.85)
+                            }
+                            .padding(4)
+                            .background(Color(red: 0.95, green: 0.89, blue: 0.91))
+                            .cornerRadius(16)
+
+                            // MARK: - Tarjeta Protagonista: Cabecera Dual + Gráfico de Barras
+                            VStack(spacing: 0) {
+                                // Cabecera Dual (Resumen del periodo + Total histórico en Malva Suave)
+                                HStack(alignment: .center) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(headerTitle)
+                                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                                            .foregroundColor(Color(red: 0.62, green: 0.54, blue: 0.58))
+
+                                        Text(vm.formatMinutesHours(headerMinutes))
+                                            .font(.system(size: 26, weight: .black, design: .rounded))
+                                            .foregroundColor(Color(red: 1.0, green: 0.30, blue: 0.45))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.8)
+                                    }
+
+                                    Spacer()
+
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        Text("Total histórico")
+                                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                            .foregroundColor(Color(red: 0.69, green: 0.58, blue: 0.63))
+
+                                        HStack(spacing: 4) {
+                                            Text("⭐")
+                                                .font(.system(size: 12))
+                                            Text(vm.formatMinutesHours(vm.totalMinutes))
+                                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                                .foregroundColor(Color(red: 0.61, green: 0.49, blue: 0.54)) // Malva Suave (#9C7E8A)
+                                                .lineLimit(1)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color(red: 0.976, green: 0.949, blue: 0.957)) // Fondo Malva Pastel (#F9F2F4)
+                                        .clipShape(Capsule())
+                                    }
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 7)
-                                .background(isSelected ? Color.white : Color.clear)
-                                .foregroundColor(
-                                    isSelected
-                                        ? Color(red: 1.0, green: 0.30, blue: 0.45)
-                                        : Color(red: 0.48, green: 0.36, blue: 0.41)
+                                .padding(.bottom, 14)
+
+                                Rectangle()
+                                    .fill(Color(red: 0.97, green: 0.91, blue: 0.93))
+                                    .frame(height: 1)
+                                    .padding(.bottom, 12)
+
+                                // Gráfico de Barras Clásico y Cute
+                                WeeklyBarChartView(
+                                    days: chartItems,
+                                    maxAxisHours: maxAxisHours,
+                                    valueFormatter: vm.formatShortBarValue
                                 )
-                                .cornerRadius(13)
-                                .shadow(color: isSelected ? Color.black.opacity(0.05) : Color.clear, radius: 3, x: 0, y: 1)
                             }
+                            .padding(16)
+                            .background(Color.white)
+                            .cornerRadius(20)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color(red: 1.0, green: 0.82, blue: 0.87), lineWidth: 1.5)
+                            )
+                            .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
+
+                            Spacer(minLength: 40)
                         }
-                    }
-                    .padding(4)
-                    .background(Color(red: 0.95, green: 0.89, blue: 0.91))
-                    .cornerRadius(16)
+                        .frame(minHeight: geo.size.height + 24, alignment: .top)
 
-                    // MARK: - Tarjeta Protagonista: Cabecera Dual + Gráfico de Barras
-                    VStack(spacing: 0) {
-                        // Cabecera Dual (Resumen del periodo + Total histórico en Malva Suave)
-                        HStack(alignment: .center) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(headerTitle)
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(Color(red: 0.62, green: 0.54, blue: 0.58))
+                        // MARK: - Barra de Acciones para Limpiar (bajo el scroll)
+                        VStack(spacing: 12) {
+                            Divider()
 
-                                Text(vm.formatMinutesHours(headerMinutes))
-                                    .font(.system(size: 26, weight: .black, design: .rounded))
-                                    .foregroundColor(Color(red: 1.0, green: 0.30, blue: 0.45))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
-
-                            Spacer()
-
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text("Total histórico")
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundColor(Color(red: 0.69, green: 0.58, blue: 0.63))
-
-                                HStack(spacing: 4) {
-                                    Text("⭐")
-                                        .font(.system(size: 12))
-                                    Text(vm.formatMinutesHours(vm.totalMinutes))
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .foregroundColor(Color(red: 0.61, green: 0.49, blue: 0.54)) // Malva Suave (#9C7E8A)
-                                        .lineLimit(1)
+                            HStack {
+                                Button("Vaciar cesta de hoy") {
+                                    resetConfirmation = .today
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Color(red: 0.976, green: 0.949, blue: 0.957)) // Fondo Malva Pastel (#F9F2F4)
-                                .clipShape(Capsule())
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(Color(red: 0.65, green: 0.45, blue: 0.55))
+
+                                Spacer()
+
+                                Button("Limpiar histórico total") {
+                                    resetConfirmation = .total
+                                }
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundColor(Color(red: 0.90, green: 0.25, blue: 0.30))
                             }
+                            .padding(.horizontal, 8)
+                            .padding(.top, 4)
                         }
-                        .padding(.bottom, 14)
-
-                        Rectangle()
-                            .fill(Color(red: 0.97, green: 0.91, blue: 0.93))
-                            .frame(height: 1)
-                            .padding(.bottom, 12)
-
-                        // Gráfico de Barras Clásico y Cute
-                        WeeklyBarChartView(
-                            days: chartItems,
-                            maxAxisHours: maxAxisHours,
-                            valueFormatter: vm.formatShortBarValue
-                        )
+                        .padding(.bottom, 12)
                     }
-                    .padding(16)
-                    .background(Color.white)
-                    .cornerRadius(20)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color(red: 1.0, green: 0.82, blue: 0.87), lineWidth: 1.5)
-                    )
-                    .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
-
-                    Spacer(minLength: 12)
-
-                    // MARK: - Barra de Acciones para Limpiar
-                    VStack(spacing: 12) {
-                        Divider()
-
-                        HStack {
-                            Button("Vaciar cesta de hoy") {
-                                resetConfirmation = .today
-                            }
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundColor(Color(red: 0.65, green: 0.45, blue: 0.55))
-
-                            Spacer()
-
-                            Button("Limpiar histórico total") {
-                                resetConfirmation = .total
-                            }
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(red: 0.90, green: 0.25, blue: 0.30))
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.top, 4)
-                    }
+                    .padding(18)
                 }
-                .padding(18)
             }
         }
         .background(Color(red: 0.99, green: 0.96, blue: 0.97).ignoresSafeArea())
